@@ -1,107 +1,117 @@
 # Implementation Roadmap
 
-This repository follows `docs/PRODUCT_REQUIREMENTS.md`, with security and transaction work moved
-forward so later UI phases do not rely on an unsafe data model. The product scope now also includes
-household-wide finance, budgeting, shared-expense settlement and AI-assisted financial analysis.
+This repository follows `docs/PRODUCT_REQUIREMENTS.md`, with security and transaction work moved forward so later UI phases do not rely on an unsafe data model. The scope also includes household-wide finance, budgeting, shared-expense settlement and optional AI-assisted financial organization.
 
-## Implemented in the current build
+## Implemented baseline
+
+### Core household app
 
 - Expo SDK 57 / React Native / strict TypeScript foundation
 - development, preview and production EAS profiles
-- Firebase environment/bootstrap and Local Emulator Suite configuration
-- Firebase Authentication: signup, login, persisted session, logout and user profile
-- secure household create/join callable functions
-- owner/admin/member model
-- invite-code regeneration
-- owner-only promote/demote member flow
-- admin/owner member removal rules
-- owner-to-member ownership transfer with previous owner retained as admin
-- voluntary household leave flow for admins/members with default-household cleanup
-- lifecycle activity events for ownership transfers and voluntary leaves
-- live household/member settings UI
-- household-scoped inventory CRUD
-- search, category/status filtering and sorting
-- quantity controls, low-stock/out-of-stock status derivation
-- mark-finished + add-to-shopping transaction
-- shared shopping list with duplicate-document prevention
-- category-grouped shopping UI and estimated total
-- trusted `purchaseShoppingListItem` Cloud Function transaction
-- purchase store, quantity, unit price, total price, and editable purchase date capture
-- inventory replenishment after purchase
-- price change calculation/history
-- purchase and price history UI
-- barcode scanning and barcode lookup/create flow
-- activity event generation and activity feed
-- Expo notification token registration per device
-- backend household push fan-out from activity events
-- Expo push ticket persistence, scheduled receipt checks, and `DeviceNotRegistered` token cleanup
-- live dashboard inventory/shopping/monthly-spend/store/price insights
-- household-wide finance categories beyond groceries
-- trusted shared-expense creation with payer/participant membership validation
-- deterministic Go Dutch split engine for direct subtotals and itemized shared lines
-- proportional bill-level discount and fee/tax allocation with exact cent reconciliation
-- per-expense debts showing who owes the payer and how much
-- partial and full Go Dutch repayment tracking by debtor or payee
-- immutable settlement audit records with expense-level partial/settled state
-- Finance balance section showing what the current user owes/is owed and repayment actions
-- owner/admin monthly household budgets with optional category limits
-- Finance tab with monthly spend, budget status, category totals, recent expenses and personal debt visibility
-- Groq-backed expense category suggestions through server-side strict structured output
-- Groq bill-text assistant that produces a reviewable draft before deterministic expense saving
-- Groq household spending insights from aggregate month/category/budget totals
-- server-side per-user AI quotas for category, bill and insight operations
-- Firebase Secret Manager declaration for the Groq API key
-- member-readable/backend-write-only AI insight records and backend-only AI quota state
-- Firestore tenant-isolation/security rules including backend-only finance, settlement and AI writes
-- emulator security-rule tests
-- Cloud Functions emulator integration coverage for ownership transfer and leave
-- Cloud Functions emulator integration coverage for household create/join/purchase, repeat-purchase rejection, and outsider denial
-- Cloud Functions emulator integration coverage for finance splits, outsider participants, budget permissions and settlements
-- GitHub Actions verification workflow
+- Firebase Authentication with persisted sessions
+- household create/join and invite regeneration
+- owner/admin/member authorization and member administration
+- ownership transfer and voluntary leave flows
+- sole-owner recursive household deletion
+- separate recent-auth account deletion with ownership guard
+- household lifecycle/activity audit events
+- inventory CRUD, quantity/status controls, search/filter/sort and barcode scanning
+- shared shopping list and transactional purchase flow
+- store/date/price capture, replenishment and price history
+- dashboard and household activity feed
+- per-device Expo push registration, ticket/receipt processing and invalid-token cleanup
+
+### Finance / Go Dutch
+
+- household-wide finance categories
+- trusted shared-expense creation
+- direct and itemized split modes
+- exact-cent discount and fee allocation
+- debt and repayment tracking
+- transaction-safe partial/full settlements
+- fail-closed stored debt-state validation
+- current-user owes/is-owed balances
+- owner/admin monthly and category budgets
+
+### AI
+
+- server-side Groq secret handling
+- structured category suggestions
+- review-first bill-text extraction
+- aggregate household spending insights
+- deterministic final money/debt calculations outside AI
+- per-user AI daily quotas
+- bounded Groq network requests
+
+### Security / reliability / delivery
+
+- Firestore tenant-isolation and backend-only privileged writes
+- Cloud Functions emulator integration tests
+- Firestore Security Rules tests
+- concurrency tests for inventory, purchases and settlements
+- deletion retry lock that survives partial recursive cleanup
+- account/household deletion tests
+- bounded Expo network requests and defensive provider-response parsing
+- CodeQL and dependency-audit workflows
+- critical dependency findings block CI; high findings remain visible for review
+- current GitHub Action majors and Google Workload Identity Federation deployment
+- Dependabot for npm, Functions and Actions
+- production release-readiness workflow
+- privacy/data-disclosure/production runbook documentation
 
 ## Still required before production release
 
-### Finance and AI
+### Repository hardening
 
-- configure the real Groq API secret and perform a staging provider smoke test
-- choose/configure the production Groq data-retention policy (Zero Data Retention if required)
-- optional receipt image OCR only after the text-assisted bill flow is production-stable
+- generate and commit root and `functions/` npm lockfiles, then move CI/deployment workflows from `npm install` to deterministic `npm ci`;
+- add broader rate/abuse controls for non-AI invite/admin-sensitive callables;
+- expand edge-case tests whenever callable/rule behavior changes;
+- keep transitive Expo/Metro and Firebase/Google dependency advisories under review and remove exceptions when upstream-supported fixes are available.
 
-### Hardening
+### Firebase / platform security
 
-- add dedicated Cloud Function tests for remaining callable/admin/transaction branches
-- add concurrency tests for two users purchasing/updating the same item
-- extend Firestore rule tests to every allowed/denied field mutation
-- enable Firebase App Check and set `enforceAppCheck: true` in production
-- add rate/abuse controls to invite, finance and administrative callables (AI callables already have daily quotas)
-- decide and implement explicit household deletion semantics for a sole owner who wants to remove the household
+- create/link real Firebase dev, staging and production projects;
+- configure native App Check attestation in staging;
+- prove valid App Check tokens on physical iOS and Android devices;
+- enable `enforceAppCheck: true` for production callable Functions only after the staging proof;
+- configure least-privilege Workload Identity Federation/IAM for production deploys;
+- configure billing/budget alerts and Cloud Scheduler for the receipt processor.
+
+### Finance and AI production setup
+
+- configure the real Groq API secret in Firebase Secret Manager;
+- choose/review the production Groq data-retention policy;
+- run live staging category, bill and insight smoke tests;
+- review provider outage/timeout UX on device;
+- keep receipt-image OCR out of the production baseline until the text-assisted flow is stable.
 
 ### Resilience and UX
 
-- explicit network/offline banner and retry states
-- optimistic updates only where conflict-safe
-- richer loading/skeleton states
-- accessibility labels/audits and dynamic text checks
-- dark-mode theme implementation (setting/model exists but UI theme is currently light)
-- destructive-action confirmation audit
-- device tests for camera and notifications
+- explicit network/offline banner and retry/pending states;
+- optimistic updates only where conflict-safe;
+- richer loading/skeleton states;
+- accessibility audit, screen-reader labels and dynamic text checks;
+- dark-mode implementation;
+- destructive-action confirmation review on real devices;
+- physical camera/notification tests.
 
-### Product completion
+### Release operations
 
-- optional custom inventory categories UI
-- optional multiple-household switching
-- expiry tracking/recipes/advanced analytics/widgets only after the production baseline is stable
+- link the real EAS project and add its project ID;
+- configure APNs/FCM and iOS/Android signing credentials;
+- finalize app icon, splash and store screenshots/assets;
+- finalize/publish privacy policy and terms with real operator/contact details;
+- complete Apple App Privacy and Google Play Data Safety forms;
+- run TestFlight/internal iOS and Play internal/closed Android testing;
+- perform final production security review;
+- submit signed production builds only after the release checklist is green.
 
-### Release
+## Post-production / optional product scope
 
-- create/link Firebase dev/staging/prod projects
-- create/link EAS project and inject generated project ID
-- configure Groq API secret and production data-retention controls
-- configure APNs and FCM credentials
-- deploy the scheduled Expo receipt processor with Cloud Scheduler available in the Firebase project
-- add final icon/splash assets
-- privacy policy and terms
-- App Store privacy disclosures / Google Play Data Safety
-- internal/TestFlight/closed-track builds
-- production security review
-- App Store and Google Play submission
+- custom inventory categories UI;
+- multiple-household switching;
+- expiry tracking;
+- recipes;
+- advanced analytics;
+- widgets/voice integrations;
+- receipt-image OCR after privacy, accuracy and operational review.
