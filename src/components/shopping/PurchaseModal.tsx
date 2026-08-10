@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import type { ShoppingListItem } from '../../types/domain';
+import { formatDateInput, parseDateInput } from '../../utils/date';
 import { centsToEuros, eurosToCents, formatMoney, parseDecimalInput } from '../../utils/money';
 import { AppButton } from '../common/AppButton';
 import { AppInput } from '../common/AppInput';
@@ -21,6 +22,7 @@ export interface PurchaseFormValue {
   quantityPurchased: number;
   unitPriceCents: number;
   storeName: string;
+  purchasedAt: string;
 }
 
 interface PurchaseModalProps {
@@ -34,6 +36,7 @@ export function PurchaseModal({ visible, item, onClose, onSubmit }: PurchaseModa
   const [quantity, setQuantity] = useState('1');
   const [unitPrice, setUnitPrice] = useState('0.00');
   const [storeName, setStoreName] = useState('');
+  const [purchaseDate, setPurchaseDate] = useState(formatDateInput());
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -44,6 +47,7 @@ export function PurchaseModal({ visible, item, onClose, onSubmit }: PurchaseModa
     setQuantity(String(item.quantityNeeded || 1));
     setUnitPrice(centsToEuros(item.estimatedPriceCents ?? 0).toFixed(2));
     setStoreName('');
+    setPurchaseDate(formatDateInput());
     setError(null);
     setSaving(false);
   }, [visible, item]);
@@ -64,6 +68,7 @@ export function PurchaseModal({ visible, item, onClose, onSubmit }: PurchaseModa
   async function submit() {
     const parsedQuantity = parseDecimalInput(quantity);
     const parsedPrice = parseDecimalInput(unitPrice);
+    const parsedPurchaseDate = parseDateInput(purchaseDate);
     const cleanStore = storeName.trim();
 
     if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
@@ -78,6 +83,10 @@ export function PurchaseModal({ visible, item, onClose, onSubmit }: PurchaseModa
       setError('Enter where the item was purchased.');
       return;
     }
+    if (!parsedPurchaseDate) {
+      setError('Enter a valid purchase date in YYYY-MM-DD format.');
+      return;
+    }
 
     try {
       setSaving(true);
@@ -86,6 +95,7 @@ export function PurchaseModal({ visible, item, onClose, onSubmit }: PurchaseModa
         quantityPurchased: parsedQuantity,
         unitPriceCents: eurosToCents(parsedPrice),
         storeName: cleanStore,
+        purchasedAt: parsedPurchaseDate,
       });
       onClose();
     } catch (submitError) {
@@ -130,6 +140,16 @@ export function PurchaseModal({ visible, item, onClose, onSubmit }: PurchaseModa
               onChangeText={setStoreName}
               placeholder="Tesco, Lidl, Aldi…"
               autoCapitalize="words"
+              editable={!saving}
+            />
+            <AppInput
+              label="Purchase date"
+              value={purchaseDate}
+              onChangeText={setPurchaseDate}
+              placeholder="YYYY-MM-DD"
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={10}
               editable={!saving}
             />
 
