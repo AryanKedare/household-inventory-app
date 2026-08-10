@@ -14,6 +14,12 @@ test('threshold marks low stock', () => {
   assert.equal(getItemStatus(3, 2), 'available');
 });
 
+test('invalid thresholds are ignored', () => {
+  assert.equal(getItemStatus(1, -1), 'available');
+  assert.equal(getItemStatus(1, Number.NaN), 'available');
+  assert.equal(getItemStatus(1, Number.POSITIVE_INFINITY), 'available');
+});
+
 test('without a threshold positive quantity remains available', () => {
   assert.equal(getItemStatus(1), 'available');
 });
