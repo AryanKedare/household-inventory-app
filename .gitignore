@@ -18,4 +18,5 @@ coverage/
 *.mobileprovision
 google-services.json
 GoogleService-Info.plist
+gha-creds-*.json
 functions/lib/
