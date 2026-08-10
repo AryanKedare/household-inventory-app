@@ -41,6 +41,9 @@ household-wide finance, budgeting, shared-expense settlement and AI-assisted fin
 - deterministic Go Dutch split engine for direct subtotals and itemized shared lines
 - proportional bill-level discount and fee/tax allocation with exact cent reconciliation
 - per-expense debts showing who owes the payer and how much
+- partial and full Go Dutch repayment tracking by debtor or payee
+- immutable settlement audit records with expense-level partial/settled state
+- Finance balance section showing what the current user owes/is owed and repayment actions
 - owner/admin monthly household budgets with optional category limits
 - Finance tab with monthly spend, budget status, category totals, recent expenses and personal debt visibility
 - Groq-backed expense category suggestions through server-side strict structured output
@@ -49,18 +52,17 @@ household-wide finance, budgeting, shared-expense settlement and AI-assisted fin
 - server-side per-user AI quotas for category, bill and insight operations
 - Firebase Secret Manager declaration for the Groq API key
 - member-readable/backend-write-only AI insight records and backend-only AI quota state
-- Firestore tenant-isolation/security rules including backend-only finance and AI writes
+- Firestore tenant-isolation/security rules including backend-only finance, settlement and AI writes
 - emulator security-rule tests
 - Cloud Functions emulator integration coverage for ownership transfer and leave
 - Cloud Functions emulator integration coverage for household create/join/purchase, repeat-purchase rejection, and outsider denial
-- Cloud Functions emulator integration coverage for finance splits, outsider participants and budget permissions
+- Cloud Functions emulator integration coverage for finance splits, outsider participants, budget permissions and settlements
 - GitHub Actions verification workflow
 
 ## Still required before production release
 
 ### Finance and AI
 
-- settlement/repayment recording so debts can be marked partially or fully paid
 - configure the real Groq API secret and perform a staging provider smoke test
 - choose/configure the production Groq data-retention policy (Zero Data Retention if required)
 - optional receipt image OCR only after the text-assisted bill flow is production-stable

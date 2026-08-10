@@ -15,6 +15,7 @@ export {
 } from './index';
 export * from './householdLifecycle';
 export { createHouseholdExpense, upsertMonthlyBudget } from './finance';
+export { recordExpenseSettlement } from './expenseSettlements';
 export {
   analyzeHouseholdBillText,
   generateHouseholdAiInsights,

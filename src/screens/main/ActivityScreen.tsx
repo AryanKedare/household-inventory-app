@@ -50,6 +50,24 @@ function activityCopy(activity: Activity): { title: string; detail: string; icon
         icon: '€',
       };
     }
+    case 'expense_settlement_recorded': {
+      const title =
+        typeof metadata.expenseTitle === 'string' ? metadata.expenseTitle : 'Household expense';
+      const amount =
+        typeof metadata.amountCents === 'number' ? formatMoney(metadata.amountCents) : null;
+      const remaining =
+        typeof metadata.remainingCents === 'number' ? formatMoney(metadata.remainingCents) : null;
+      return {
+        title: `${title} repayment recorded`,
+        detail:
+          amount && remaining
+            ? `${amount} paid · ${remaining} remaining`
+            : amount
+              ? `${amount} paid`
+              : 'Go Dutch balance updated',
+        icon: '↔',
+      };
+    }
     case 'member_joined': {
       const displayName = typeof metadata.displayName === 'string' ? metadata.displayName : 'A member';
       return { title: `${displayName} joined`, detail: 'Joined the household', icon: '👤' };
