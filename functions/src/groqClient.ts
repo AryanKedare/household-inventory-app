@@ -4,6 +4,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 export const GROQ_API_KEY = defineSecret('GROQ_API_KEY');
 
 const GROQ_CHAT_COMPLETIONS_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_REQUEST_TIMEOUT_MS = 20_000;
 export const GROQ_TEXT_MODEL = 'openai/gpt-oss-20b';
 
 interface GroqChatResponse {
@@ -34,32 +35,42 @@ export async function requestGroqStructured<T>(input: {
     throw new HttpsError('failed-precondition', 'Household AI is not configured yet.');
   }
 
-  const response = await fetch(GROQ_CHAT_COMPLETIONS_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({
-      model: input.model ?? GROQ_TEXT_MODEL,
-      messages: [
-        { role: 'system', content: input.system },
-        { role: 'user', content: input.user },
-      ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: input.schema.name,
-          strict: true,
-          schema: input.schema.schema,
-        },
+  let response: Response;
+  try {
+    response = await fetch(GROQ_CHAT_COMPLETIONS_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
       },
-      reasoning_effort: 'low',
-      temperature: 0.2,
-      max_completion_tokens: input.maxCompletionTokens ?? 1800,
-    }),
-  });
+      signal: AbortSignal.timeout(GROQ_REQUEST_TIMEOUT_MS),
+      body: JSON.stringify({
+        model: input.model ?? GROQ_TEXT_MODEL,
+        messages: [
+          { role: 'system', content: input.system },
+          { role: 'user', content: input.user },
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: input.schema.name,
+            strict: true,
+            schema: input.schema.schema,
+          },
+        },
+        reasoning_effort: 'low',
+        temperature: 0.2,
+        max_completion_tokens: input.maxCompletionTokens ?? 1800,
+      }),
+    });
+  } catch (error) {
+    console.error(
+      'Groq request failed before receiving a response',
+      error instanceof Error ? error.name : 'Unknown network error',
+    );
+    throw new HttpsError('unavailable', 'Household AI is temporarily unavailable.');
+  }
 
   let payload: GroqChatResponse;
   try {
