@@ -130,6 +130,70 @@ export function SettingsScreen() {
     }
   }
 
+  function confirmTransferOwnership(member: HouseholdMember) {
+    if (!householdId) {
+      return;
+    }
+
+    const memberName = member.displayName || member.email;
+    Alert.alert(
+      'Transfer household ownership?',
+      `${memberName} will become the owner. You will remain in the household as an admin.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Transfer',
+          onPress: () => {
+            const busyId = `transfer:${member.userId}`;
+            setAdminBusyId(busyId);
+            void householdService
+              .transferHouseholdOwnership(householdId, member.userId)
+              .then(() => {
+                Alert.alert('Ownership transferred', `${memberName} is now the household owner.`);
+              })
+              .catch((error) => Alert.alert('Could not transfer ownership', toUserMessage(error)))
+              .finally(() => setAdminBusyId(null));
+          },
+        },
+      ],
+    );
+  }
+
+  function confirmLeaveHousehold() {
+    if (!householdId) {
+      return;
+    }
+
+    if (householdDetails.currentRole === 'owner') {
+      Alert.alert(
+        'Transfer ownership first',
+        'The household owner cannot leave until another member has been made owner.',
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Leave household?',
+      'You will lose access to this household inventory, shopping list, history, and activity.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: () => {
+            setAdminBusyId('leave');
+            void householdService
+              .leaveHousehold(householdId)
+              .catch((error) => {
+                setAdminBusyId(null);
+                Alert.alert('Could not leave household', toUserMessage(error));
+              });
+          },
+        },
+      ],
+    );
+  }
+
   const canAdminister =
     householdDetails.currentRole === 'owner' || householdDetails.currentRole === 'admin';
   const isOwner = householdDetails.currentRole === 'owner';
@@ -163,6 +227,7 @@ export function SettingsScreen() {
                 title="Regenerate"
                 variant="secondary"
                 loading={adminBusyId === 'invite'}
+                disabled={adminBusyId !== null && adminBusyId !== 'invite'}
                 onPress={() => void regenerateInvite()}
                 style={styles.smallButton}
               />
@@ -184,6 +249,8 @@ export function SettingsScreen() {
             (householdDetails.currentRole === 'owner' ||
               (householdDetails.currentRole === 'admin' && member.role === 'member'));
           const canChangeRole = isOwner && !isSelf && member.role !== 'owner';
+          const canTransferOwnership = isOwner && !isSelf && member.role !== 'owner';
+          const transferBusyId = `transfer:${member.userId}`;
 
           return (
             <View
@@ -199,6 +266,16 @@ export function SettingsScreen() {
                 <Text style={styles.role}>{member.role.toUpperCase()}</Text>
               </View>
               <View style={styles.memberActions}>
+                {canTransferOwnership ? (
+                  <AppButton
+                    title="Make owner"
+                    variant="secondary"
+                    loading={adminBusyId === transferBusyId}
+                    disabled={adminBusyId !== null && adminBusyId !== transferBusyId}
+                    onPress={() => confirmTransferOwnership(member)}
+                    style={styles.memberButton}
+                  />
+                ) : null}
                 {canChangeRole ? (
                   <AppButton
                     title={member.role === 'admin' ? 'Make member' : 'Make admin'}
@@ -221,6 +298,23 @@ export function SettingsScreen() {
             </View>
           );
         })}
+      </AppCard>
+
+      <AppCard style={styles.card}>
+        <Text style={styles.sectionLabel}>HOUSEHOLD ACCESS</Text>
+        <Text style={styles.settingTitle}>Leave this household</Text>
+        <Text style={styles.settingDescription}>
+          {isOwner
+            ? 'Transfer ownership to another member before leaving. Owners cannot leave an ownerless household.'
+            : 'Leaving removes your access. Your account stays active and you can create or join another household.'}
+        </Text>
+        <AppButton
+          title="Leave household"
+          variant="danger"
+          loading={adminBusyId === 'leave'}
+          disabled={adminBusyId !== null || isOwner}
+          onPress={confirmLeaveHousehold}
+        />
       </AppCard>
 
       <AppCard style={styles.card}>
