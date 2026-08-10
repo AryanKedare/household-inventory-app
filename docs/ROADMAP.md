@@ -38,14 +38,14 @@ forward so later UI phases do not rely on an unsafe data model.
 - Firestore tenant-isolation/security rules
 - emulator security-rule tests
 - Cloud Functions emulator integration coverage for ownership transfer and leave
+- Cloud Functions emulator integration coverage for household create/join/purchase, repeat-purchase rejection, and outsider denial
 - GitHub Actions verification workflow
 
 ## Still required before production release
 
 ### Hardening
 
-- add dedicated Cloud Function tests for all callable/admin/transaction branches
-- add emulator integration tests for household create/join/purchase flows
+- add dedicated Cloud Function tests for remaining callable/admin/transaction branches
 - add concurrency tests for two users purchasing/updating the same item
 - extend Firestore rule tests to every allowed/denied field mutation
 - enable Firebase App Check and set `enforceAppCheck: true` in production
