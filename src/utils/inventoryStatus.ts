@@ -8,7 +8,12 @@ export function getItemStatus(
     return 'out_of_stock';
   }
 
-  if (typeof lowStockThreshold === 'number' && quantity <= lowStockThreshold) {
+  if (
+    typeof lowStockThreshold === 'number' &&
+    Number.isFinite(lowStockThreshold) &&
+    lowStockThreshold >= 0 &&
+    quantity <= lowStockThreshold
+  ) {
     return 'low_stock';
   }
 
