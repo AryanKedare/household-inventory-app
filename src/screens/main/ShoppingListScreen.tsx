@@ -48,10 +48,12 @@ export function ShoppingListScreen() {
     return null;
   }
 
+  const activeHouseholdId = householdId;
+
   async function changeQuantity(item: ShoppingListItem, quantity: number) {
     try {
       setBusyItemId(item.id);
-      await shoppingService.updateShoppingQuantity(householdId, item.id, quantity);
+      await shoppingService.updateShoppingQuantity(activeHouseholdId, item.id, quantity);
     } catch (updateError) {
       Alert.alert('Could not update quantity', toUserMessage(updateError));
     } finally {
@@ -68,7 +70,7 @@ export function ShoppingListScreen() {
         onPress: () => {
           setBusyItemId(item.id);
           void shoppingService
-            .removeShoppingItem(householdId, item.id)
+            .removeShoppingItem(activeHouseholdId, item.id)
             .catch((removeError) => {
               Alert.alert('Could not remove item', toUserMessage(removeError));
             })
@@ -86,7 +88,7 @@ export function ShoppingListScreen() {
     try {
       setBusyItemId(purchaseItem.id);
       await purchaseService.purchaseShoppingListItem({
-        householdId,
+        householdId: activeHouseholdId,
         shoppingListItemId: purchaseItem.id,
         quantityPurchased: value.quantityPurchased,
         unitPriceCents: value.unitPriceCents,
@@ -135,13 +137,13 @@ export function ShoppingListScreen() {
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
           <View style={styles.itemWrap}>
-          <ShoppingItemCard
-            item={item}
-            busy={busyItemId === item.id}
-            onQuantityChange={(quantity) => void changeQuantity(item, quantity)}
-            onPurchase={() => setPurchaseItem(item)}
-            onRemove={() => confirmRemove(item)}
-          />
+            <ShoppingItemCard
+              item={item}
+              busy={busyItemId === item.id}
+              onQuantityChange={(quantity) => void changeQuantity(item, quantity)}
+              onPurchase={() => setPurchaseItem(item)}
+              onRemove={() => confirmRemove(item)}
+            />
           </View>
         )}
         ListEmptyComponent={
