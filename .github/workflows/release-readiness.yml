@@ -1,0 +1,101 @@
+name: Production Release Readiness
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install mobile dependencies
+        run: npm install
+
+      - name: Install function dependencies
+        run: npm --prefix functions install
+
+      - name: Verify application and backend
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run functions:build
+          npm run test:functions
+          npm run test:rules
+
+      - name: Require production App Check enforcement
+        shell: bash
+        run: |
+          if grep -R --line-number --fixed-string 'enforceAppCheck: false' functions/src; then
+            echo 'Production release blocked: callable Functions still contain enforceAppCheck: false.'
+            exit 1
+          fi
+
+      - name: Require finalized legal documents
+        shell: bash
+        run: |
+          if grep -R --line-number -E '\[(LEGAL_OPERATOR_NAME|CONTACT_EMAIL|COUNTRY_OR_ADDRESS|EFFECTIVE_DATE)\]' docs/PRIVACY_POLICY.md docs/TERMS_OF_USE.md; then
+            echo 'Production release blocked: privacy/terms placeholders remain.'
+            exit 1
+          fi
+
+      - name: Require real EAS project ID
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const config = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          const projectId = config?.expo?.extra?.eas?.projectId;
+          if (typeof projectId !== 'string' || projectId.length < 10) {
+            console.error('Production release blocked: app.json has no real expo.extra.eas.projectId.');
+            process.exit(1);
+          }
+          NODE
+
+      - name: Reject placeholder Firebase project aliases
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const config = JSON.parse(fs.readFileSync('.firebaserc', 'utf8'));
+          const aliases = config.projects || {};
+          const values = Object.values(aliases);
+          if (!aliases.dev || !aliases.staging || !aliases.prod) {
+            console.error('Production release blocked: dev/staging/prod Firebase aliases are required.');
+            process.exit(1);
+          }
+          if (values.some((value) => /^household-app-(dev|staging|prod)$/.test(String(value)))) {
+            console.error('Production release blocked: placeholder Firebase project IDs remain.');
+            process.exit(1);
+          }
+          NODE
+
+      - name: Ensure Groq secret is not exposed to mobile source
+        shell: bash
+        run: |
+          if grep -R --line-number -E 'EXPO_PUBLIC_.*GROQ|GROQ_API_KEY[[:space:]]*=' src app.json .env.example 2>/dev/null; then
+            echo 'Production release blocked: possible Groq secret exposure in mobile/public configuration.'
+            exit 1
+          fi
+
+      - name: Confirm release documentation exists
+        run: |
+          test -f docs/PRIVACY_POLICY.md
+          test -f docs/TERMS_OF_USE.md
+          test -f docs/PRODUCTION_RELEASE.md
+
+      - name: Release gate passed
+        run: echo 'Repository-level production release gates passed. Continue with physical-device and store-console sign-off from docs/PRODUCTION_RELEASE.md.'
