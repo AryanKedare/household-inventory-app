@@ -14,4 +14,5 @@ export {
   shoppingItemReactivatedActivity,
 } from './index';
 export * from './householdLifecycle';
+export { createHouseholdExpense, upsertMonthlyBudget } from './finance';
 export { householdActivityNotification, processExpoPushReceipts } from './pushNotifications';
