@@ -9,6 +9,9 @@
     "customConditions": [
       "react-native"
     ],
+    "types": [
+      "node"
+    ],
     "paths": {
       "@/*": [
         "./src/*"
