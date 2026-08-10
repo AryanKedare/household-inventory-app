@@ -168,12 +168,25 @@ export interface HouseholdExpense {
   totalPaidCents: number;
   allocations: ExpenseAllocation[];
   debts: ExpenseDebt[];
+  settlementStatus?: 'open' | 'partial' | 'settled';
   currency: string;
   expenseDate: Timestamp;
   notes?: string | null;
   createdBy: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+export interface ExpenseSettlement {
+  id: string;
+  expenseId: string;
+  fromUserId: string;
+  toUserId: string;
+  amountCents: number;
+  currency: string;
+  note?: string | null;
+  recordedBy: string;
+  createdAt: Timestamp;
 }
 
 export interface MonthlyBudget {
@@ -196,6 +209,7 @@ export type ActivityType =
   | 'shopping_item_removed'
   | 'item_purchased'
   | 'expense_created'
+  | 'expense_settlement_recorded'
   | 'member_joined'
   | 'member_removed'
   | 'member_left'
