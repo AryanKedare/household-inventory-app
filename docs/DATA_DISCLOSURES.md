@@ -14,9 +14,9 @@ This document is an implementation-based worksheet for completing Apple App Priv
 
 | Data / content | Why HomeStock processes it | Shared with household members? | External service processing | User control |
 |---|---|---|---|---|
-| Email address | Authentication/account | May be visible to household members in membership UI | Firebase Authentication | Account/data request; sign out |
-| Display name | Account/household identity | Yes | Firebase/Firestore | Account/data request |
-| Household membership/role | Authorization and sharing | Yes | Firebase/Firestore/Functions | Leave/remove/transfer/delete flows |
+| Email address | Authentication/account | May be visible to household members in membership UI | Firebase Authentication | In-app account deletion; sign out |
+| Display name | Account/household identity | Yes | Firebase/Firestore | In-app account deletion |
+| Household membership/role | Authorization and sharing | Yes | Firebase/Firestore/Functions | Leave/remove/transfer/delete flows; account deletion for non-owner memberships |
 | Household invite code | Joining household | Shared intentionally by user | Firebase/Firestore/Functions | Admin can regenerate |
 | Inventory/product names | Household inventory | Yes | Firebase/Firestore | Edit/delete; household deletion |
 | Barcode | Item lookup/entry | Yes | Firebase/Firestore | Edit/delete; household deletion |
@@ -28,14 +28,14 @@ This document is an implementation-based worksheet for completing Apple App Priv
 | Payer/participant assignments | Go Dutch calculation | Yes | Firebase/Firestore/Functions | Household deletion |
 | Debt/repayment/settlement records | Go Dutch balances/audit | Yes | Firebase/Firestore/Functions | Household deletion |
 | Household budgets | Budget tracking | Yes | Firebase/Firestore/Functions | Admin edits; household deletion |
-| Device platform / Expo push token | Push notifications | No ordinary UI sharing | Firebase + Expo push service | Disable notifications |
+| Device platform / Expo push token | Push notifications | No ordinary UI sharing | Firebase + Expo push service | Disable notifications; account deletion |
 | Push delivery receipts/errors | Delivery maintenance | No | Firebase/Cloud Functions + Expo | Backend retention/cleanup |
 | Camera image stream | Barcode scanning | Not stored by current barcode flow | Processed on-device by camera/scanner path | Camera permission |
 | AI category request text | Optional category suggestion | Result may be visible via saved expense if user saves | Firebase Functions + Groq | Only sent on explicit AI action |
 | AI bill text | Optional bill draft extraction | Reviewed result can become household expense only after user saves | Firebase Functions + Groq | Explicit submit; user edits/rejects draft |
 | AI member aliases/display names | Optional bill participant suggestion | Household identities already shared within household | Firebase Functions + Groq during bill request | Only during explicit AI bill request |
 | Aggregate month/category/budget totals | Optional household AI insights | Saved insight visible to household members | Firebase Functions + Groq | Explicit Generate/Refresh; household deletion |
-| AI usage quota counters | Abuse/cost control | No | Firebase/Firestore/Functions | Backend-only |
+| AI usage quota counters | Abuse/cost control | No | Firebase/Firestore/Functions | Backend-only; account deletion |
 
 ## Apple App Privacy worksheet
 
@@ -89,7 +89,7 @@ For each Play Console data type, verify whether it is:
 3. required or optional;
 4. used for app functionality, account management, security/fraud prevention, personalization, analytics, advertising, or other purposes;
 5. encrypted in transit;
-6. deletable through in-app household deletion or a separate account/data request process.
+6. deletable through in-app account deletion, household deletion, or an appropriate account/data request process depending on whether the record is personal or shared household history.
 
 ## Groq AI disclosure checklist
 
@@ -121,9 +121,12 @@ If receipt-image OCR is added later, update:
 
 ## Deletion disclosure
 
-Current household deletion is available only to the sole owner and is designed to recursively remove household-scoped records, including inventory, shopping, purchases, expenses, budgets, settlements, activity and saved AI insights, while clearing the owner's default household and active invite.
+HomeStock now implements two separate deletion paths:
 
-Account-level deletion requirements should be reviewed separately before public release. If the store or applicable law requires in-app account deletion, implement and disclose it before submission rather than treating household deletion as account deletion.
+- **Household deletion:** available only to the sole household owner and recursively removes household-scoped records, including inventory, shopping, purchases, expenses, budgets, settlements, activity and saved AI insights, while clearing the owner's default household and active invite.
+- **Account deletion:** available in Settings and requires recent authentication. It removes the Firebase Authentication account, personal profile/device records, AI quota state, and non-owner household memberships. A user who still owns a household must transfer ownership or delete that household first.
+
+Shared household accounting history can remain after an individual member deletes their account because remaining household members still rely on that shared financial/audit history. The public privacy policy and store disclosures must state this accurately.
 
 ## Final review before store submission
 

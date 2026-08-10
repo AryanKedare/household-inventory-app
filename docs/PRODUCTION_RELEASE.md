@@ -138,7 +138,10 @@ Use at least two real household accounts on separate physical devices.
 - ownership transfer;
 - leave household;
 - remove member;
-- sole-owner permanent deletion.
+- sole-owner permanent household deletion;
+- non-owner in-app account deletion;
+- owner account deletion blocked until ownership is transferred or the owned household is deleted;
+- account deletion removes login/profile/device/membership data while preserving shared household accounting history required by remaining members.
 
 ### Inventory and shopping
 
@@ -202,7 +205,8 @@ Before public release:
 - rate/abuse limits verified for sensitive endpoints;
 - concurrency tests passing;
 - household isolation tests passing;
-- recursive deletion tested against realistic household data;
+- household recursive deletion tested against realistic household data;
+- account deletion and ownership guard tested against realistic household data;
 - dependency/security findings reviewed rather than blindly force-upgraded.
 
 ## 10. Privacy and store disclosures
@@ -212,6 +216,7 @@ Before submission:
 - publish the final privacy policy at a stable public URL;
 - publish the final terms at a stable public URL if used in the product/store listing;
 - disclose account/contact data, household content, purchase/finance data, device/push data, and AI-provider processing accurately in Apple privacy disclosures and Google Play Data Safety;
+- disclose the distinction between in-app account deletion and household deletion, including retained shared household financial/audit history where applicable;
 - disclose the purpose of camera access (barcode scanning and any future receipt-image feature);
 - disclose push-notification usage;
 - ensure screenshots and store copy describe AI as assistive, not guaranteed financial advice;
@@ -256,6 +261,7 @@ Release only when all answers are YES:
 - [ ] APNs/FCM push tests passed
 - [ ] two-device concurrency scenarios passed
 - [ ] household deletion passed with realistic data
+- [ ] account deletion passed with realistic member/owner scenarios
 - [ ] privacy policy finalized/published
 - [ ] terms finalized/published if applicable
 - [ ] Apple privacy disclosures completed
