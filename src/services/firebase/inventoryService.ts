@@ -13,6 +13,7 @@ import {
   writeBatch,
   type Unsubscribe,
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 
 import type { InventoryItem } from '../../types/domain';
 import { getItemStatus } from '../../utils/inventoryStatus';
@@ -29,12 +30,16 @@ export interface InventoryItemInput {
   barcode?: string;
 }
 
-function requireDb() {
+function requireServices() {
   const services = getFirebaseServices();
   if (!services) {
     throw new Error('Firebase is not configured.');
   }
-  return services.db;
+  return services;
+}
+
+function requireDb() {
+  return requireServices().db;
 }
 
 function itemCollection(householdId: string) {
@@ -61,7 +66,6 @@ export function subscribeToInventory(
     (error) => onError(error),
   );
 }
-
 
 export async function findInventoryItemByBarcode(
   householdId: string,
@@ -144,19 +148,21 @@ export async function updateItem(
 
 export async function setQuantity(
   householdId: string,
-  uid: string,
   item: InventoryItem,
   quantity: number,
 ): Promise<void> {
-  const db = requireDb();
   const nextQuantity = Math.max(0, quantity);
+  const delta = nextQuantity - item.quantity;
+  if (delta === 0) {
+    return;
+  }
 
-  await updateDoc(doc(db, 'households', householdId, 'items', item.id), {
-    quantity: nextQuantity,
-    status: getItemStatus(nextQuantity, item.lowStockThreshold),
-    updatedBy: uid,
-    updatedAt: serverTimestamp(),
-  });
+  const adjustQuantity = httpsCallable<
+    { householdId: string; itemId: string; delta: number },
+    { itemId: string; quantity: number; status: InventoryItem['status'] }
+  >(requireServices().functions, 'adjustInventoryQuantity');
+
+  await adjustQuantity({ householdId, itemId: item.id, delta });
 }
 
 export async function deleteItem(householdId: string, itemId: string): Promise<void> {
