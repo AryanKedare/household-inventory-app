@@ -164,7 +164,7 @@ export function PurchaseModal({ visible, item, onClose, onSubmit }: PurchaseModa
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(11, 18, 32, 0.52)' },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(11, 18, 32, 0.52)' },
   sheet: {
     maxHeight: '88%',
     backgroundColor: colors.background,
