@@ -58,10 +58,15 @@ households/{householdId}
   categories/{categoryId}
 
 inviteCodes/{inviteCode}
+pushReceipts/{expoTicketId}
 ```
 
 The active shopping-list document uses the inventory item ID, which prevents multiple active
 documents for the same inventory item. A purchased document can later be reactivated.
+
+`pushReceipts` is backend-only transient delivery state. It maps an accepted Expo push ticket to the
+Expo token and the current Firestore device-document paths that produced that token. Clients cannot
+read or write this collection.
 
 ## Purchase transaction
 
@@ -90,6 +95,13 @@ create their activity inside the purchase transaction. An activity-create trigge
 household notifications and sends them to enabled per-device Expo push tokens, excluding the actor
 where possible.
 
+Accepted Expo push tickets are stored in `pushReceipts/{expoTicketId}`. A scheduled Cloud Function
+checks due receipts after the delivery window. Successful receipts are removed. A
+`DeviceNotRegistered` ticket or receipt disables only device documents that still contain the same
+Expo token, preventing an old receipt from disabling a newly rotated token. Other final delivery
+errors are logged and removed from the queue. Receipt requests that fail at the service/network level
+leave queued tickets intact for a later scheduled attempt.
+
 Push delivery is intentionally downstream from the core transaction: a notification failure does not
 roll back a successful household purchase/update.
 
@@ -104,5 +116,6 @@ Firestore rules currently:
 - validate active shopping-list item structure and linked inventory existence
 - deny client writes to purchases, price history and activities
 - deny all client access to invite-code lookup documents
+- deny all client access to Expo push-receipt queue documents
 
 Before release, App Check must be configured and enabled for production callable functions.
