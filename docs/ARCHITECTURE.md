@@ -57,9 +57,11 @@ households/{householdId}
   priceHistory/{priceHistoryId}
   expenses/{expenseId}
   budgets/{yyyy-mm}
+  aiInsights/{yyyy-mm}
   activities/{activityId}
   categories/{categoryId}
 
+aiUsage/{uid}_{yyyy-mm-dd}
 inviteCodes/{inviteCode}
 pushReceipts/{expoTicketId}
 ```
@@ -70,6 +72,9 @@ documents for the same inventory item. A purchased document can later be reactiv
 `pushReceipts` is backend-only transient delivery state. It maps an accepted Expo push ticket to the
 Expo token and the current Firestore device-document paths that produced that token. Clients cannot
 read or write this collection.
+
+`aiUsage` is backend-only quota state used to bound provider cost and abuse. Household AI insight
+records are member-readable but can only be written by trusted Cloud Functions.
 
 ## Purchase transaction
 
@@ -122,12 +127,48 @@ Monthly budgets live at `budgets/{yyyy-mm}` and can include an overall household
 limits for any household finance category. Only owners/admins can change budgets through the trusted
 callable; all household members can read them.
 
-## AI boundary
+## Groq household AI
 
-The finance schema is intentionally ready for AI-assisted categorization and household insights.
-The AI layer may suggest categories, extract receipt/bill line items, suggest participant assignment,
-and summarize aggregate spending. AI output is advisory and must be validated before persistence.
-Discount, fee, share and debt calculations remain deterministic server-side code.
+Groq integration runs only in Cloud Functions. The mobile app never receives the Groq API key. The
+`GROQ_API_KEY` value is declared with Firebase Secret Manager and is bound only to AI callables.
+The current text model is `openai/gpt-oss-20b` through Groq's OpenAI-compatible chat-completions API,
+using strict JSON-schema structured output.
+
+The AI layer has three responsibilities:
+
+1. **Expense category suggestion** — the model chooses one category from the same fixed taxonomy used
+   by the trusted finance backend. The user can override the suggestion before saving.
+2. **Bill-text assistant** — free-form receipt/bill text is converted into a draft containing line
+   descriptions, amounts, optional participant suggestions, bill-level discount/fees and a category.
+   Household users are represented to the model using server-generated aliases; Firebase user IDs are
+   mapped back only on the server. Ambiguous participant assignments remain unassigned and are flagged
+   for review. The draft is never persisted as a real expense by the AI callable.
+3. **Household spending insights** — the backend aggregates recent expenses into month/category totals
+   and budget figures before sending data to Groq. Individual member spending breakdowns are not sent
+   for the insight workflow. Saved insight text remains advisory.
+
+Every AI path requires authenticated household membership and consumes a daily server-side quota.
+Current per-user UTC-day limits are 40 category suggestions, 20 bill analyses and 5 household insight
+generations. Quota state is inaccessible to clients.
+
+### AI-to-money trust boundary
+
+AI output cannot create or modify debts directly. A bill draft must be reviewed in the mobile UI and
+is then submitted through `createHouseholdExpense`. The deterministic finance engine revalidates the
+payer/participants and calculates line splitting, discounts, fees, exact cent rounding and final debts.
+This means an inaccurate AI extraction can be corrected without allowing model output to become an
+authoritative monetary calculation.
+
+### AI data handling
+
+The bill assistant sends only the bill text that the user explicitly submits plus the household member
+aliases/display names required to make participant suggestions. The UI warns users not to submit
+unnecessary sensitive information such as card or bank details.
+
+The production Groq organization should be reviewed/configured for the desired data-retention policy,
+including Zero Data Retention if required. The application privacy policy must disclose that submitted
+AI-assistant text is processed by an external AI provider. The Groq secret must never be stored in
+Expo public environment variables, the mobile bundle or Firestore.
 
 ## Activity and notifications
 
@@ -155,8 +196,9 @@ Firestore rules currently:
 - deny direct household/member role writes
 - validate inventory quantity/status/price/audit ownership
 - validate active shopping-list item structure and linked inventory existence
-- deny client writes to purchases, price history, household expenses, budgets and activities
-- deny outsiders access to household finance records
+- deny client writes to purchases, price history, household expenses, budgets, AI insights and activities
+- deny outsiders access to household finance and AI insight records
+- deny all client access to AI usage/quota documents
 - deny all client access to invite-code lookup documents
 - deny all client access to Expo push-receipt queue documents
 
