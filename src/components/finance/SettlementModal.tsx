@@ -63,6 +63,9 @@ export function SettlementModal({
     return null;
   }
 
+  const activeExpense = expense;
+  const activeDebt = debt;
+
   async function submit() {
     const parsed = parseDecimalInput(amount);
     if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -80,8 +83,8 @@ export function SettlementModal({
       setError(null);
       await onSubmit({
         householdId,
-        expenseId: expense.id,
-        fromUserId: debt.fromUserId,
+        expenseId: activeExpense.id,
+        fromUserId: activeDebt.fromUserId,
         amountCents,
         note: note.trim() || undefined,
       });
@@ -99,7 +102,7 @@ export function SettlementModal({
         <Pressable style={styles.backdrop} onPress={saving ? undefined : onClose} />
         <View style={styles.card}>
           <Text style={styles.eyebrow}>GO DUTCH REPAYMENT</Text>
-          <Text style={styles.title}>{expense.title}</Text>
+          <Text style={styles.title}>{activeExpense.title}</Text>
           <Text style={styles.subtitle}>
             {debtorName} owes {payeeName} {formatMoney(outstandingCents)} outstanding.
           </Text>
