@@ -1,9 +1,14 @@
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 
 const db = getFirestore();
 const REGION = 'europe-west1';
 const EXPO_PUSH_SEND_URL = 'https://exp.host/--/api/v2/push/send';
+const EXPO_PUSH_RECEIPTS_URL = 'https://exp.host/--/api/v2/push/getReceipts';
+const RECEIPT_CHECK_DELAY_MS = 15 * 60 * 1000;
+const RECEIPT_EXPIRY_MS = 24 * 60 * 60 * 1000;
+const RECEIPT_BATCH_LIMIT = 500;
 
 interface ExpoPushMessage {
   to: string;
@@ -18,18 +23,31 @@ interface PushTarget {
   devicePaths: string[];
 }
 
+interface ExpoPushDetails {
+  error?: unknown;
+  [key: string]: unknown;
+}
+
 interface ExpoPushTicket {
   status?: unknown;
   id?: unknown;
   message?: unknown;
-  details?: {
-    error?: unknown;
-    [key: string]: unknown;
-  };
+  details?: ExpoPushDetails;
+}
+
+interface ExpoPushReceipt {
+  status?: unknown;
+  message?: unknown;
+  details?: ExpoPushDetails;
 }
 
 interface ExpoPushSendResponse {
   data?: ExpoPushTicket[] | ExpoPushTicket;
+  errors?: unknown;
+}
+
+interface ExpoPushReceiptResponse {
+  data?: Record<string, ExpoPushReceipt>;
   errors?: unknown;
 }
 
@@ -40,7 +58,7 @@ function isExpoPushToken(value: unknown): value is string {
   );
 }
 
-function isDeviceNotRegistered(details: ExpoPushTicket['details']): boolean {
+function isDeviceNotRegistered(details: ExpoPushDetails | undefined): boolean {
   return details?.error === 'DeviceNotRegistered';
 }
 
@@ -221,6 +239,23 @@ async function sendExpoPushTargets(
   }
 }
 
+function queuedTarget(data: Record<string, unknown>): PushTarget | null {
+  const token = data.expoPushToken;
+  if (!isExpoPushToken(token) || !Array.isArray(data.devicePaths)) {
+    return null;
+  }
+
+  const devicePaths = data.devicePaths.filter(
+    (value): value is string =>
+      typeof value === 'string' && /^users\/[^/]+\/devices\/[^/]+$/.test(value),
+  );
+  if (devicePaths.length === 0) {
+    return null;
+  }
+
+  return { token, devicePaths: [...new Set(devicePaths)] };
+}
+
 export const householdActivityNotification = onDocumentCreated(
   { region: REGION, document: 'households/{householdId}/activities/{activityId}' },
   async (event) => {
@@ -245,6 +280,104 @@ export const householdActivityNotification = onDocumentCreated(
     } catch (error) {
       // Push delivery must never make the underlying household action fail or retry forever.
       console.error('Unable to send household push notifications', error);
+    }
+  },
+);
+
+export const processExpoPushReceipts = onSchedule(
+  {
+    schedule: 'every 15 minutes',
+    region: REGION,
+    timeZone: 'Etc/UTC',
+  },
+  async () => {
+    const now = Date.now();
+    const dueAt = Timestamp.fromMillis(now - RECEIPT_CHECK_DELAY_MS);
+    const pending = await db
+      .collection('pushReceipts')
+      .where('sentAt', '<=', dueAt)
+      .orderBy('sentAt', 'asc')
+      .limit(RECEIPT_BATCH_LIMIT)
+      .get();
+
+    if (pending.empty) {
+      return;
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(EXPO_PUSH_RECEIPTS_URL, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ids: pending.docs.map((document) => document.id) }),
+      });
+    } catch (error) {
+      console.error('Unable to request Expo push receipts', error);
+      return;
+    }
+
+    if (!response.ok) {
+      const responseBody = await response.text();
+      console.error('Expo push receipt request failed', response.status, responseBody.slice(0, 500));
+      return;
+    }
+
+    const payload = (await response.json()) as ExpoPushReceiptResponse;
+    const receipts = payload.data ?? {};
+    const batch = db.batch();
+    let writeCount = 0;
+
+    for (const pendingDocument of pending.docs) {
+      const pendingData = pendingDocument.data();
+      const target = queuedTarget(pendingData);
+      const sentAt = pendingData.sentAt;
+      const receipt = receipts[pendingDocument.id];
+
+      if (!target || !(sentAt instanceof Timestamp)) {
+        batch.delete(pendingDocument.ref);
+        writeCount += 1;
+        continue;
+      }
+
+      if (!receipt) {
+        if (sentAt.toMillis() <= now - RECEIPT_EXPIRY_MS) {
+          batch.delete(pendingDocument.ref);
+          writeCount += 1;
+        }
+        continue;
+      }
+
+      if (receipt.status === 'ok') {
+        batch.delete(pendingDocument.ref);
+        writeCount += 1;
+        continue;
+      }
+
+      if (receipt.status === 'error' && isDeviceNotRegistered(receipt.details)) {
+        try {
+          await disableTarget(target);
+          batch.delete(pendingDocument.ref);
+          writeCount += 1;
+        } catch (error) {
+          console.error('Unable to disable unregistered Expo push token', error);
+        }
+        continue;
+      }
+
+      console.error('Expo push delivery receipt reported an error', {
+        receiptId: pendingDocument.id,
+        message: typeof receipt.message === 'string' ? receipt.message : 'Unknown Expo receipt error',
+        error: receipt.details?.error,
+      });
+      batch.delete(pendingDocument.ref);
+      writeCount += 1;
+    }
+
+    if (writeCount > 0) {
+      await batch.commit();
     }
   },
 );
