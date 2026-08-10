@@ -16,7 +16,7 @@ Updated: 10 August 2026
 - Inventory create/edit/delete, search, category/status filtering, sorting, quantity controls, low-stock/out-of-stock logic
 - Barcode scan flow for existing and new inventory items
 - Shared shopping list with deterministic item IDs, quantity edits, category grouping, estimated total, and duplicate prevention
-- Transactional purchase flow that records store, quantity, unit price, total price, inventory replenishment, price changes, history, and activity
+- Transactional purchase flow that records store, quantity, unit price, editable purchase date, total price, inventory replenishment, price changes, history, and activity
 - Dashboard inventory/shopping/monthly-spend/store/price-change insights
 - Item purchase and price history
 - Household activity feed
@@ -39,6 +39,8 @@ The CI pipeline has successfully completed the following checks on the household
 
 The lifecycle integration test verifies that an owner cannot leave an ownerless household, ownership can be transferred atomically, the previous owner becomes an admin, the new owner is promoted, the previous owner can then leave, their default household is cleared, and lifecycle activity records are created.
 
+Purchase date input has unit coverage for stable `YYYY-MM-DD` formatting/parsing and rejects malformed or impossible calendar dates before the request reaches the backend.
+
 ## External setup still required
 
 - Create/choose the Firebase dev, staging, and production projects and replace placeholder project IDs.
@@ -49,7 +51,6 @@ The lifecycle integration test verifies that an owner cannot leave an ownerless 
 
 ## Remaining MVP/product hardening
 
-- Editable purchase date in the purchase sheet
 - Explicit delete-household flow for a sole owner who wants to remove the household entirely
 - App Check enablement and enforcement before production
 - Push receipt processing and invalid-token cleanup
