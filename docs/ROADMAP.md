@@ -14,6 +14,9 @@ forward so later UI phases do not rely on an unsafe data model.
 - invite-code regeneration
 - owner-only promote/demote member flow
 - admin/owner member removal rules
+- owner-to-member ownership transfer with previous owner retained as admin
+- voluntary household leave flow for admins/members with default-household cleanup
+- lifecycle activity events for ownership transfers and voluntary leaves
 - live household/member settings UI
 - household-scoped inventory CRUD
 - search, category/status filtering and sorting
@@ -33,6 +36,7 @@ forward so later UI phases do not rely on an unsafe data model.
 - live dashboard inventory/shopping/monthly-spend/store/price insights
 - Firestore tenant-isolation/security rules
 - emulator security-rule tests
+- Cloud Functions emulator integration coverage for ownership transfer and leave
 - GitHub Actions verification workflow
 
 ## Still required before production release
@@ -46,7 +50,7 @@ forward so later UI phases do not rely on an unsafe data model.
 - enable Firebase App Check and set `enforceAppCheck: true` in production
 - add rate/abuse controls to invite and administrative callables
 - add notification push-receipt handling and invalid-token cleanup
-- decide and implement household ownership transfer / owner leave semantics
+- decide and implement explicit household deletion semantics for a sole owner who wants to remove the household
 
 ### Resilience and UX
 

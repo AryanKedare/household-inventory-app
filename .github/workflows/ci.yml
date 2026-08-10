@@ -41,5 +41,8 @@ jobs:
       - name: Build Cloud Functions
         run: npm run functions:build
 
+      - name: Cloud Functions emulator integration tests
+        run: npm run test:functions
+
       - name: Firestore Security Rules tests
         run: npm run test:rules

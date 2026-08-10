@@ -46,6 +46,23 @@ function activityCopy(activity: Activity): { title: string; detail: string; icon
     }
     case 'member_removed':
       return { title: 'Member removed', detail: 'Household membership changed', icon: '👤' };
+    case 'member_left': {
+      const displayName = typeof metadata.displayName === 'string' ? metadata.displayName : 'A member';
+      return { title: `${displayName} left`, detail: 'Left the household', icon: '↗' };
+    }
+    case 'ownership_transferred': {
+      const newOwnerName =
+        typeof metadata.newOwnerName === 'string' ? metadata.newOwnerName : 'A household member';
+      const previousOwnerName =
+        typeof metadata.previousOwnerName === 'string' ? metadata.previousOwnerName : null;
+      return {
+        title: `${newOwnerName} is now owner`,
+        detail: previousOwnerName
+          ? `Ownership transferred by ${previousOwnerName}`
+          : 'Household ownership transferred',
+        icon: '★',
+      };
+    }
     default:
       return { title: 'Household updated', detail: 'A household action was recorded', icon: '•' };
   }

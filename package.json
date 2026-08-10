@@ -14,6 +14,7 @@
     "format:check": "prettier --check .",
     "test": "node --import tsx --test tests/unit/*.test.ts",
     "test:watch": "node --watch --import tsx --test tests/unit/*.test.ts",
+    "test:functions": "firebase emulators:exec --project demo-homestock --only auth,firestore,functions \"node --import tsx --test tests/functions/*.test.ts\"",
     "test:rules": "firebase emulators:exec --only firestore \"node --import tsx --test tests/rules/*.test.ts\"",
     "emulators": "firebase emulators:start",
     "functions:build": "npm --prefix functions run build",
