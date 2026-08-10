@@ -2,7 +2,7 @@
   "name": "household-inventory-functions",
   "version": "0.1.0",
   "private": true,
-  "main": "lib/index.js",
+  "main": "lib/entry.js",
   "engines": {
     "node": "22"
   },
