@@ -16,6 +16,11 @@ test('decimal input accepts dot and comma separators', () => {
   assert.equal(Number.isNaN(parseDecimalInput('invalid')), true);
 });
 
+test('blank decimal input is invalid instead of silently becoming zero', () => {
+  assert.equal(Number.isNaN(parseDecimalInput('')), true);
+  assert.equal(Number.isNaN(parseDecimalInput('   ')), true);
+});
+
 test('money formatting defaults to EUR for Ireland', () => {
   const formatted = formatMoney(275);
   assert.match(formatted, /2\.75/);
