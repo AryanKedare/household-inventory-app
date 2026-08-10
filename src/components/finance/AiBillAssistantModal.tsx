@@ -126,6 +126,22 @@ export function AiBillAssistantModal({
     );
   }
 
+  function addLine() {
+    setLines((current) => [
+      ...current,
+      {
+        key: `manual-${Date.now()}-${current.length}`,
+        description: '',
+        amount: '',
+        participantIds: [],
+      },
+    ]);
+  }
+
+  function removeLine(index: number) {
+    setLines((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  }
+
   function toggleParticipant(index: number, userId: string) {
     setLines((current) =>
       current.map((line, currentIndex) => {
@@ -361,8 +377,20 @@ export function AiBillAssistantModal({
                           );
                         })}
                       </View>
+                      <AppButton
+                        title="Remove line"
+                        variant="danger"
+                        disabled={saving}
+                        onPress={() => removeLine(index)}
+                      />
                     </View>
                   ))}
+                  <AppButton
+                    title="Add missing line"
+                    variant="secondary"
+                    disabled={saving}
+                    onPress={addLine}
+                  />
                 </View>
 
                 <AppInput label="Bill discount (€)" value={discount} onChangeText={setDiscount} keyboardType="decimal-pad" editable={!saving} />
