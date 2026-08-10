@@ -12,7 +12,7 @@ import {
   type Auth,
   type User,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, setDoc, Timestamp, where } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable, type Functions } from 'firebase/functions';
 
 const PROJECT_ID = 'demo-homestock';
@@ -97,6 +97,16 @@ test('non-owner deletion removes account data but preserves shared household his
     assert.equal((await getDoc(doc(db, 'households', 'account-home', 'members', member.user.uid))).exists(), false);
     assert.equal((await getDoc(doc(db, 'aiUsage', `${member.user.uid}_2026-08-10`))).exists(), false);
     assert.equal((await getDoc(doc(db, 'households', 'account-home', 'expenses', 'history'))).exists(), true);
+
+    const leaveActivities = await getDocs(
+      query(
+        collection(db, 'households', 'account-home', 'activities'),
+        where('actorId', '==', member.user.uid),
+        where('type', '==', 'member_left'),
+      ),
+    );
+    assert.equal(leaveActivities.size, 1);
+    assert.equal(leaveActivities.docs[0]?.data().metadata?.reason, 'account_deleted');
   });
 
   await signOut(member.auth);
