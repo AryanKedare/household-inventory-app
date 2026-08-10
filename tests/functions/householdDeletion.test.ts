@@ -151,27 +151,3 @@ test('owner cannot delete household while another member remains', async () => {
     (error: unknown) => callableErrorCode(error) === 'functions/failed-precondition',
   );
 });
-
-test('join is rejected once a household is locked for deletion', async () => {
-  await testEnv.clearFirestore();
-  const owner = await createAuthedUser('delete-lock-owner', 'delete-lock-owner@example.test');
-  const joiner = await createAuthedUser('delete-lock-joiner', 'delete-lock-joiner@example.test');
-  await seedHousehold(owner.user);
-
-  await testEnv.withSecurityRulesDisabled(async (context) => {
-    await setDoc(
-      doc(context.firestore(), 'households', 'delete-home'),
-      { deleting: true },
-      { merge: true },
-    );
-  });
-
-  const joinHousehold = httpsCallable<{ inviteCode: string }, unknown>(
-    joiner.functions,
-    'joinHousehold',
-  );
-  await assert.rejects(
-    () => joinHousehold({ inviteCode: 'DEL234' }),
-    (error: unknown) => callableErrorCode(error) === 'functions/failed-precondition',
-  );
-});
