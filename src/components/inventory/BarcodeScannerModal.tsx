@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   messageTitle: { color: colors.text, fontSize: 22, fontWeight: '800' },
   message: { color: colors.textMuted, lineHeight: 22 },
   cameraWrap: { flex: 1, overflow: 'hidden' },
-  overlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  overlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   target: {
     width: '82%',
     height: 190,

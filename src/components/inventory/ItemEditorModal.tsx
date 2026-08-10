@@ -10,7 +10,7 @@ import {
 
 import { DEFAULT_CATEGORIES } from '../../constants/categories';
 import type { InventoryItem } from '../../types/domain';
-import { centsToEuros, eurosToCents } from '../../utils/money';
+import { centsToEuros, eurosToCents, parseDecimalInput } from '../../utils/money';
 import { AppButton } from '../common/AppButton';
 import { AppInput } from '../common/AppInput';
 import type { InventoryItemInput } from '../../services/firebase/inventoryService';
@@ -63,9 +63,10 @@ export function ItemEditorModal({
   }, [initialBarcode, item, visible]);
 
   async function save() {
-    const numericQuantity = Number(quantity);
-    const numericPrice = price.trim() === '' ? 0 : Number(price);
-    const numericThreshold = lowThreshold.trim() === '' ? undefined : Number(lowThreshold);
+    const numericQuantity = parseDecimalInput(quantity);
+    const numericPrice = price.trim() === '' ? 0 : parseDecimalInput(price);
+    const numericThreshold =
+      lowThreshold.trim() === '' ? undefined : parseDecimalInput(lowThreshold);
 
     if (name.trim().length === 0) {
       setError('Item name is required.');

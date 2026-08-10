@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 
 import type { ShoppingListItem } from '../../types/domain';
-import { centsToEuros, eurosToCents, formatMoney } from '../../utils/money';
+import { centsToEuros, eurosToCents, formatMoney, parseDecimalInput } from '../../utils/money';
 import { AppButton } from '../common/AppButton';
 import { AppInput } from '../common/AppInput';
 import { colors } from '../../theme/colors';
@@ -49,8 +49,8 @@ export function PurchaseModal({ visible, item, onClose, onSubmit }: PurchaseModa
   }, [visible, item]);
 
   const totalCents = useMemo(() => {
-    const parsedQuantity = Number(quantity);
-    const parsedPrice = Number(unitPrice.replace(',', '.'));
+    const parsedQuantity = parseDecimalInput(quantity);
+    const parsedPrice = parseDecimalInput(unitPrice);
     if (!Number.isFinite(parsedQuantity) || !Number.isFinite(parsedPrice)) {
       return 0;
     }
@@ -62,8 +62,8 @@ export function PurchaseModal({ visible, item, onClose, onSubmit }: PurchaseModa
   }
 
   async function submit() {
-    const parsedQuantity = Number(quantity);
-    const parsedPrice = Number(unitPrice.replace(',', '.'));
+    const parsedQuantity = parseDecimalInput(quantity);
+    const parsedPrice = parseDecimalInput(unitPrice);
     const cleanStore = storeName.trim();
 
     if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
@@ -164,7 +164,7 @@ export function PurchaseModal({ visible, item, onClose, onSubmit }: PurchaseModa
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(11, 18, 32, 0.52)' },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(11, 18, 32, 0.52)' },
   sheet: {
     maxHeight: '88%',
     backgroundColor: colors.background,

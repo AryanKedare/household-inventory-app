@@ -70,6 +70,9 @@ export function InventoryScreen() {
     return null;
   }
 
+  const activeHouseholdId = householdId;
+  const activeUser = user;
+
   function openAdd() {
     setEditingItem(null);
     setInitialBarcode(undefined);
@@ -84,7 +87,7 @@ export function InventoryScreen() {
 
   async function handleBarcode(barcode: string) {
     try {
-      const existing = await inventoryService.findInventoryItemByBarcode(householdId, barcode);
+      const existing = await inventoryService.findInventoryItemByBarcode(activeHouseholdId, barcode);
       setScannerVisible(false);
       if (existing) {
         openEdit(existing);
@@ -101,10 +104,10 @@ export function InventoryScreen() {
 
   async function saveItem(input: inventoryService.InventoryItemInput) {
     if (editingItem) {
-      await inventoryService.updateItem(householdId, user.uid, editingItem.id, input);
+      await inventoryService.updateItem(activeHouseholdId, activeUser.uid, editingItem.id, input);
       return;
     }
-    await inventoryService.addItem(householdId, user.uid, input);
+    await inventoryService.addItem(activeHouseholdId, activeUser.uid, input);
   }
 
   function confirmDelete() {
@@ -119,7 +122,7 @@ export function InventoryScreen() {
         style: 'destructive',
         onPress: () => {
           void inventoryService
-            .deleteItem(householdId, target.id)
+            .deleteItem(activeHouseholdId, target.id)
             .then(() => {
               setEditorVisible(false);
               setEditingItem(null);
@@ -135,7 +138,7 @@ export function InventoryScreen() {
   async function changeQuantity(item: InventoryItem, nextQuantity: number) {
     try {
       setBusyItemId(item.id);
-      await inventoryService.setQuantity(householdId, user.uid, item, nextQuantity);
+      await inventoryService.setQuantity(activeHouseholdId, activeUser.uid, item, nextQuantity);
     } catch (quantityError) {
       Alert.alert('Could not update quantity', toUserMessage(quantityError));
     } finally {
@@ -146,7 +149,7 @@ export function InventoryScreen() {
   async function addToShopping(item: InventoryItem) {
     try {
       setBusyItemId(item.id);
-      await shoppingService.addInventoryItemToShoppingList(householdId, user.uid, item);
+      await shoppingService.addInventoryItemToShoppingList(activeHouseholdId, activeUser.uid, item);
     } catch (shoppingError) {
       Alert.alert('Could not update shopping list', toUserMessage(shoppingError));
     } finally {
@@ -157,7 +160,7 @@ export function InventoryScreen() {
   async function markFinished(item: InventoryItem) {
     try {
       setBusyItemId(item.id);
-      await shoppingService.markFinishedAndAddToShoppingList(householdId, user.uid, item);
+      await shoppingService.markFinishedAndAddToShoppingList(activeHouseholdId, activeUser.uid, item);
     } catch (finishError) {
       Alert.alert('Could not mark item finished', toUserMessage(finishError));
     } finally {
@@ -286,7 +289,7 @@ export function InventoryScreen() {
 
       <ItemHistoryModal
         visible={historyItem !== null}
-        householdId={householdId}
+        householdId={activeHouseholdId}
         item={historyItem}
         onClose={() => setHistoryItem(null)}
       />

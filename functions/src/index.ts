@@ -326,6 +326,9 @@ export const purchaseShoppingListItem = onCall<PurchaseShoppingListItemRequest>(
       }
 
       const shoppingItem = shoppingSnapshot.data();
+      if (!shoppingItem) {
+        throw new HttpsError('data-loss', 'Shopping list item data is unavailable.');
+      }
       if (shoppingItem.status !== 'active') {
         throw new HttpsError('failed-precondition', 'This shopping list item is no longer active.');
       }
@@ -342,6 +345,9 @@ export const purchaseShoppingListItem = onCall<PurchaseShoppingListItemRequest>(
       }
 
       const inventory = inventorySnapshot.data();
+      if (!inventory) {
+        throw new HttpsError('data-loss', 'Inventory item data is unavailable.');
+      }
       const currentQuantity =
         typeof inventory.quantity === 'number' && Number.isFinite(inventory.quantity)
           ? inventory.quantity

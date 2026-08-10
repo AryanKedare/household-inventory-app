@@ -1,3 +1,11 @@
+export function parseDecimalInput(value: string): number {
+  const normalized = value.trim().replace(',', '.');
+  if (normalized.length === 0) {
+    return Number.NaN;
+  }
+  return Number(normalized);
+}
+
 export function eurosToCents(value: number): number {
   return Math.round(value * 100);
 }
