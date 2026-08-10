@@ -15,6 +15,7 @@ export {
 } from './index';
 export * from './householdLifecycle';
 export { deleteAccount } from './accountDeletion';
+export { adjustInventoryQuantity } from './inventoryQuantity';
 export { createHouseholdExpense, upsertMonthlyBudget } from './finance';
 export { recordExpenseSettlement } from './expenseSettlements';
 export {
