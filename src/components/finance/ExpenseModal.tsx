@@ -13,6 +13,7 @@ import {
 import { AppButton } from '../common/AppButton';
 import { AppInput } from '../common/AppInput';
 import { EXPENSE_CATEGORIES } from '../../constants/expenseCategories';
+import * as aiService from '../../services/firebase/aiService';
 import type {
   CreateHouseholdExpenseInput,
   CreateHouseholdExpenseResult,
@@ -21,6 +22,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import type { ExpenseCategoryId, HouseholdMember } from '../../types/domain';
 import { formatDateInput, parseDateInput } from '../../utils/date';
+import { toUserMessage } from '../../utils/firebaseError';
 import { eurosToCents, formatMoney, parseDecimalInput } from '../../utils/money';
 
 interface ExpenseModalProps {
@@ -50,6 +52,8 @@ export function ExpenseModal({
   const [notes, setNotes] = useState('');
   const [memberAmounts, setMemberAmounts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<aiService.SuggestedCategory | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,6 +70,8 @@ export function ExpenseModal({
     setNotes('');
     setMemberAmounts(Object.fromEntries(members.map((member) => [member.userId, ''])));
     setSaving(false);
+    setAiBusy(false);
+    setAiSuggestion(null);
     setError(null);
   }, [currentUserId, members, visible]);
 
@@ -91,6 +97,29 @@ export function ExpenseModal({
 
   function updateMemberAmount(userId: string, value: string) {
     setMemberAmounts((current) => ({ ...current, [userId]: value }));
+  }
+
+  async function suggestCategory() {
+    if (!title.trim()) {
+      setError('Enter the expense first so AI has something to categorize.');
+      return;
+    }
+    try {
+      setAiBusy(true);
+      setError(null);
+      const suggestion = await aiService.suggestExpenseCategory({
+        householdId,
+        title: title.trim(),
+        merchantName: merchantName.trim() || undefined,
+        notes: notes.trim() || undefined,
+      });
+      setCategoryId(suggestion.categoryId);
+      setAiSuggestion(suggestion);
+    } catch (aiError) {
+      setError(toUserMessage(aiError));
+    } finally {
+      setAiBusy(false);
+    }
   }
 
   async function submit() {
@@ -163,7 +192,7 @@ export function ExpenseModal({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.overlay}
       >
-        <Pressable style={styles.backdrop} onPress={saving ? undefined : onClose} />
+        <Pressable style={styles.backdrop} onPress={saving || aiBusy ? undefined : onClose} />
         <View style={styles.sheet}>
           <View style={styles.handle} />
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
@@ -173,20 +202,42 @@ export function ExpenseModal({
               Enter each person’s amount before the bill-level discount. HomeStock applies discounts and fees proportionally and keeps the final cents exact.
             </Text>
 
-            <AppInput label="Expense" value={title} onChangeText={setTitle} placeholder="Dinner, electricity bill, new TV…" editable={!saving} />
-            <AppInput label="Merchant / payee (optional)" value={merchantName} onChangeText={setMerchantName} placeholder="Restaurant, ESB, Amazon…" editable={!saving} />
-            <AppInput label="Date" value={expenseDate} onChangeText={setExpenseDate} placeholder="YYYY-MM-DD" autoCapitalize="none" editable={!saving} />
+            <AppInput label="Expense" value={title} onChangeText={setTitle} placeholder="Dinner, electricity bill, new TV…" editable={!saving && !aiBusy} />
+            <AppInput label="Merchant / payee (optional)" value={merchantName} onChangeText={setMerchantName} placeholder="Restaurant, ESB, Amazon…" editable={!saving && !aiBusy} />
+            <AppInput label="Date" value={expenseDate} onChangeText={setExpenseDate} placeholder="YYYY-MM-DD" autoCapitalize="none" editable={!saving && !aiBusy} />
 
             <View style={styles.group}>
-              <Text style={styles.label}>Category</Text>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Category</Text>
+                <AppButton
+                  title="Suggest with AI"
+                  variant="secondary"
+                  loading={aiBusy}
+                  disabled={saving}
+                  onPress={() => void suggestCategory()}
+                  style={styles.aiButton}
+                />
+              </View>
+              {aiSuggestion ? (
+                <View style={styles.aiNote}>
+                  <Text style={styles.aiNoteTitle}>
+                    AI suggestion · {Math.round(aiSuggestion.confidence * 100)}% confidence
+                  </Text>
+                  <Text style={styles.aiNoteText}>{aiSuggestion.reason}</Text>
+                  <Text style={styles.aiDisclaimer}>Review AI suggestions before saving.</Text>
+                </View>
+              ) : null}
               <View style={styles.chips}>
                 {EXPENSE_CATEGORIES.map((category) => (
                   <Pressable
                     key={category.id}
                     accessibilityRole="button"
                     accessibilityState={{ selected: category.id === categoryId }}
-                    disabled={saving}
-                    onPress={() => setCategoryId(category.id)}
+                    disabled={saving || aiBusy}
+                    onPress={() => {
+                      setCategoryId(category.id);
+                      setAiSuggestion(null);
+                    }}
                     style={[
                       styles.chip,
                       category.id === categoryId ? styles.chipSelected : undefined,
@@ -209,7 +260,7 @@ export function ExpenseModal({
                     key={member.userId}
                     accessibilityRole="button"
                     accessibilityState={{ selected: member.userId === paidBy }}
-                    disabled={saving}
+                    disabled={saving || aiBusy}
                     onPress={() => setPaidBy(member.userId)}
                     style={[
                       styles.chip,
@@ -235,7 +286,7 @@ export function ExpenseModal({
                   onChangeText={(value) => updateMemberAmount(member.userId, value)}
                   keyboardType="decimal-pad"
                   placeholder="0.00"
-                  editable={!saving}
+                  editable={!saving && !aiBusy}
                 />
               ))}
             </View>
@@ -246,7 +297,7 @@ export function ExpenseModal({
                 value={discount}
                 onChangeText={setDiscount}
                 keyboardType="decimal-pad"
-                editable={!saving}
+                editable={!saving && !aiBusy}
                 style={styles.flexInput}
               />
               <AppInput
@@ -254,12 +305,12 @@ export function ExpenseModal({
                 value={fees}
                 onChangeText={setFees}
                 keyboardType="decimal-pad"
-                editable={!saving}
+                editable={!saving && !aiBusy}
                 style={styles.flexInput}
               />
             </View>
 
-            <AppInput label="Notes (optional)" value={notes} onChangeText={setNotes} multiline editable={!saving} />
+            <AppInput label="Notes (optional)" value={notes} onChangeText={setNotes} multiline editable={!saving && !aiBusy} />
 
             <View style={styles.preview}>
               <View style={styles.previewRow}><Text style={styles.previewLabel}>Subtotal</Text><Text style={styles.previewValue}>{formatMoney(preview.subtotalCents)}</Text></View>
@@ -271,8 +322,8 @@ export function ExpenseModal({
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <View style={styles.actions}>
-              <AppButton title="Cancel" variant="secondary" onPress={onClose} disabled={saving} style={styles.action} />
-              <AppButton title="Calculate & save" onPress={() => void submit()} loading={saving} style={styles.action} />
+              <AppButton title="Cancel" variant="secondary" onPress={onClose} disabled={saving || aiBusy} style={styles.action} />
+              <AppButton title="Calculate & save" onPress={() => void submit()} loading={saving} disabled={aiBusy} style={styles.action} />
             </View>
           </ScrollView>
         </View>
@@ -291,7 +342,13 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 26, fontWeight: '800' },
   subtitle: { color: colors.textMuted, lineHeight: 21 },
   group: { gap: spacing.sm },
+  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   label: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  aiButton: { minHeight: 38, paddingHorizontal: spacing.md },
+  aiNote: { backgroundColor: '#EEF3FF', borderRadius: 14, padding: spacing.md, gap: spacing.xs },
+  aiNoteTitle: { color: colors.primary, fontSize: 12, fontWeight: '800' },
+  aiNoteText: { color: colors.text, fontSize: 13, lineHeight: 18 },
+  aiDisclaimer: { color: colors.textMuted, fontSize: 11 },
   help: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, paddingVertical: 9, paddingHorizontal: 12 },
