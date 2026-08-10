@@ -14,6 +14,7 @@ export {
   shoppingItemReactivatedActivity,
 } from './index';
 export * from './householdLifecycle';
+export { adjustInventoryQuantity } from './inventoryQuantity';
 export { createHouseholdExpense, upsertMonthlyBudget } from './finance';
 export { recordExpenseSettlement } from './expenseSettlements';
 export {
