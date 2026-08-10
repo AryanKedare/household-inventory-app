@@ -8,6 +8,7 @@ import { Screen } from '../../components/common/Screen';
 import { useAuth } from '../../context/AuthContext';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useHouseholdDetails } from '../../hooks/useHouseholdDetails';
+import * as accountService from '../../services/firebase/accountService';
 import * as householdService from '../../services/firebase/householdService';
 import * as notificationService from '../../services/firebase/notificationService';
 import { colors } from '../../theme/colors';
@@ -217,6 +218,28 @@ export function SettingsScreen() {
     );
   }
 
+  function confirmDeleteAccount() {
+    Alert.alert(
+      'Delete your HomeStock account permanently?',
+      'Your account, profile, notification devices, household memberships, and personal AI quota data will be deleted. Shared household financial history may remain for other household members. If you own a household, transfer ownership or delete that household first. You may be asked to sign in again before deletion.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete my account',
+          style: 'destructive',
+          onPress: () => {
+            setAdminBusyId('delete-account');
+            void accountService
+              .deleteAccount()
+              .then(() => signOut())
+              .catch((error) => Alert.alert('Could not delete account', toUserMessage(error)))
+              .finally(() => setAdminBusyId(null));
+          },
+        },
+      ],
+    );
+  }
+
   const canAdminister =
     householdDetails.currentRole === 'owner' || householdDetails.currentRole === 'admin';
   const isOwner = householdDetails.currentRole === 'owner';
@@ -389,7 +412,7 @@ export function SettingsScreen() {
 
       {isOwner ? (
         <AppCard style={styles.card}>
-          <Text style={styles.sectionLabel}>DANGER ZONE</Text>
+          <Text style={styles.sectionLabel}>HOUSEHOLD DANGER ZONE</Text>
           <Text style={styles.settingTitle}>Delete household</Text>
           <Text style={styles.settingDescription}>
             {householdDetails.members.length === 1
@@ -408,6 +431,21 @@ export function SettingsScreen() {
           />
         </AppCard>
       ) : null}
+
+      <AppCard style={styles.card}>
+        <Text style={styles.sectionLabel}>ACCOUNT DANGER ZONE</Text>
+        <Text style={styles.settingTitle}>Delete account</Text>
+        <Text style={styles.settingDescription}>
+          Permanently delete your HomeStock login and personal account data. Shared household accounting records may remain for other household members. Household owners must transfer ownership or delete their household first.
+        </Text>
+        <AppButton
+          title="Delete my account permanently"
+          variant="danger"
+          loading={adminBusyId === 'delete-account'}
+          disabled={adminBusyId !== null && adminBusyId !== 'delete-account'}
+          onPress={confirmDeleteAccount}
+        />
+      </AppCard>
 
       <AppButton title="Sign out" variant="secondary" onPress={() => void signOut()} />
     </Screen>
