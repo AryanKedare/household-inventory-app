@@ -131,6 +131,10 @@ service cloud.firestore {
       }
     }
 
+    match /pushReceipts/{receiptId} {
+      allow read, write: if false; // Expo delivery receipts are backend-only infrastructure.
+    }
+
     match /inviteCodes/{inviteCode} {
       allow read, write: if false; // Access only through trusted backend functions.
     }

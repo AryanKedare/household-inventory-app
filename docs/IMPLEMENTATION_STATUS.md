@@ -21,12 +21,15 @@ Updated: 10 August 2026
 - Item purchase and price history
 - Household activity feed
 - Per-device Expo notification registration plus backend household notification fan-out
+- Expo push-ticket persistence and scheduled push-receipt processing
+- Automatic disabling of device records when Expo reports `DeviceNotRegistered`, guarded against token rotation
+- Backend-only Firestore receipt queue with explicit Security Rules coverage
 - GitHub Actions workflow for install, typecheck, lint, unit tests, Functions build, Cloud Functions emulator integration tests, and Firestore rules tests
 - EAS build profiles and development/preview/production configuration scaffolding
 
 ## Verification completed in GitHub Actions
 
-The CI pipeline has successfully completed the following checks on the household lifecycle implementation:
+The CI pipeline has successfully completed the following checks on merged application/lifecycle changes:
 
 - mobile dependency installation
 - Cloud Functions dependency installation
@@ -41,11 +44,14 @@ The lifecycle integration test verifies that an owner cannot leave an ownerless 
 
 Purchase date input has unit coverage for stable `YYYY-MM-DD` formatting/parsing and rejects malformed or impossible calendar dates before the request reaches the backend.
 
+The push-receipt branch adds a Firestore rule regression test proving signed-in clients cannot access the backend receipt queue. Full branch verification is performed by the pull-request CI before merge.
+
 ## External setup still required
 
 - Create/choose the Firebase dev, staging, and production projects and replace placeholder project IDs.
 - Enable Firebase Email/Password Authentication.
 - Deploy Firestore rules/indexes and Cloud Functions after environment provisioning.
+- Ensure the Firebase production project can deploy the scheduled receipt processor through Cloud Scheduler.
 - Link the app to an Expo/EAS project (`eas init`) so an EAS project ID is written into app configuration.
 - Configure iOS/Android push credentials for production notifications.
 
@@ -53,7 +59,6 @@ Purchase date input has unit coverage for stable `YYYY-MM-DD` formatting/parsing
 
 - Explicit delete-household flow for a sole owner who wants to remove the household entirely
 - App Check enablement and enforcement before production
-- Push receipt processing and invalid-token cleanup
 - Integration coverage for create/join/purchase and concurrency-sensitive flows
 - Broader Cloud Functions and Firestore rule branch coverage
 - Offline UX and retry/pending-state polish

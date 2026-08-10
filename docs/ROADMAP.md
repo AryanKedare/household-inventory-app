@@ -33,6 +33,7 @@ forward so later UI phases do not rely on an unsafe data model.
 - activity event generation and activity feed
 - Expo notification token registration per device
 - backend household push fan-out from activity events
+- Expo push ticket persistence, scheduled receipt checks, and `DeviceNotRegistered` token cleanup
 - live dashboard inventory/shopping/monthly-spend/store/price insights
 - Firestore tenant-isolation/security rules
 - emulator security-rule tests
@@ -49,7 +50,6 @@ forward so later UI phases do not rely on an unsafe data model.
 - extend Firestore rule tests to every allowed/denied field mutation
 - enable Firebase App Check and set `enforceAppCheck: true` in production
 - add rate/abuse controls to invite and administrative callables
-- add notification push-receipt handling and invalid-token cleanup
 - decide and implement explicit household deletion semantics for a sole owner who wants to remove the household
 
 ### Resilience and UX
@@ -73,6 +73,7 @@ forward so later UI phases do not rely on an unsafe data model.
 - create/link Firebase dev/staging/prod projects
 - create/link EAS project and inject generated project ID
 - configure APNs and FCM credentials
+- deploy the scheduled Expo receipt processor with Cloud Scheduler available in the Firebase project
 - add final icon/splash assets
 - privacy policy and terms
 - App Store privacy disclosures / Google Play Data Safety
