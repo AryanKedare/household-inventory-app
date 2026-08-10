@@ -65,6 +65,25 @@ export interface UpsertMonthlyBudgetInput {
   categoryLimits: CategoryBudgetInput[];
 }
 
+export interface RecordExpenseSettlementInput {
+  householdId: string;
+  expenseId: string;
+  fromUserId: string;
+  amountCents: number;
+  note?: string;
+}
+
+export interface RecordExpenseSettlementResult {
+  settlementId: string;
+  expenseId: string;
+  fromUserId: string;
+  toUserId: string;
+  amountCents: number;
+  settledCents: number;
+  remainingCents: number;
+  settlementStatus: 'partial' | 'settled';
+}
+
 function requireServices() {
   const services = getFirebaseServices();
   if (!services) {
@@ -89,6 +108,16 @@ export async function upsertMonthlyBudget(input: UpsertMonthlyBudgetInput): Prom
     'upsertMonthlyBudget',
   );
   await call(input);
+}
+
+export async function recordExpenseSettlement(
+  input: RecordExpenseSettlementInput,
+): Promise<RecordExpenseSettlementResult> {
+  const call = httpsCallable<RecordExpenseSettlementInput, RecordExpenseSettlementResult>(
+    requireServices().functions,
+    'recordExpenseSettlement',
+  );
+  return (await call(input)).data;
 }
 
 export function subscribeToHouseholdExpenses(
