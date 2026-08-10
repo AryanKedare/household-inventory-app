@@ -1,41 +1,76 @@
 # HomeStock
 
-HomeStock is a cross-platform iOS/Android household inventory and shared shopping-list app. Household
-members can track what is at home, mark items finished, share what needs buying, scan product
-barcodes, record purchases/stores, see price movement, and receive household updates.
+HomeStock is a cross-platform iOS/Android household inventory, shopping and shared-household finance app. Household members can track what is at home, share what needs buying, scan product barcodes, record purchases and price changes, manage household expenses/budgets, split shared bills, record repayments and receive household updates.
 
-The product baseline is in `docs/PRODUCT_REQUIREMENTS.md`. Engineering decisions and security changes
-are documented in `docs/ARCHITECTURE.md`.
+The product baseline is in `docs/PRODUCT_REQUIREMENTS.md`. Architecture and release controls are documented in `docs/ARCHITECTURE.md`, `docs/IMPLEMENTATION_STATUS.md`, `docs/SECURITY_REVIEW_2026-08-11.md` and `docs/PRODUCTION_RELEASE.md`.
 
 ## Current implementation
 
-The repository now includes a working MVP code path for:
+### Household and account lifecycle
 
-- email/password signup, login, persisted auth and logout
+- email/password signup/login, persisted auth and logout
 - secure household creation and invite-code joining
 - owner/admin/member household administration
-- live inventory CRUD, search, filter and sort
-- quantity stepper, low-stock and out-of-stock logic
-- shared shopping list with category grouping and estimated total
-- atomic purchase completion with quantity, store and actual unit price
-- purchase history and price-change history
-- barcode scan → find existing item / prefill new item
-- household activity feed
-- dashboard inventory/shopping/monthly-spending/store/price insights
-- per-device Expo notification registration and backend push fan-out
-- Firestore tenant/security rules and emulator rule tests
-- Firebase emulators, Cloud Functions, EAS profiles and GitHub Actions CI
+- invite regeneration, role changes and member removal
+- ownership transfer and voluntary household leave
+- sole-owner recursive household deletion
+- separate recent-auth in-app account deletion with household-owner guard
+- lifecycle/activity audit records
 
-This is **not yet a production release**. Native dependency installation, Firebase/EAS project linking,
-full emulator/device tests, App Check, release credentials/assets and store submission still need to
-be completed in a connected development environment.
+### Inventory, shopping and purchases
+
+- household-scoped inventory CRUD, search/filter/sort and quantity controls
+- low-stock/out-of-stock status
+- barcode scan → existing item or prefilled new item
+- shared shopping list with duplicate prevention and estimated total
+- transactional purchase completion with quantity, store, unit price and editable purchase date
+- inventory replenishment, purchase history and price-change history
+- concurrency-safe quantity and purchase operations
+- dashboard and household activity feed
+
+### Household Finance / Go Dutch
+
+- household expense categories
+- direct per-person and itemized shared-expense entry
+- deterministic discount/fee allocation with exact-cent reconciliation
+- debts showing who owes whom
+- partial/full repayment recording by debtor or payee
+- transaction-safe settlement state and immutable repayment records
+- current-user owes/is-owed view
+- owner/admin monthly and per-category budgets
+
+### Optional AI assistance
+
+- Groq API key stored only as a Firebase Functions secret
+- structured expense-category suggestions
+- review-first bill-text extraction
+- aggregate household spending insights
+- deterministic HomeStock code performs final financial calculations
+- daily per-user AI quotas
+- bounded provider request timeouts
+
+### Notifications and security
+
+- per-device Expo push registration
+- household notification fan-out and Expo ticket/receipt processing
+- invalid push-token cleanup
+- household-scoped Firestore Security Rules
+- privileged finance/lifecycle/history/AI/audit writes restricted to trusted backend code
+- Cloud Functions emulator integration tests and Firestore Rules tests
+- concurrency regression tests
+- CodeQL and npm dependency-audit workflows
+- Dependabot for npm/Functions/GitHub Actions
+- Workload Identity Federation deployment workflow for Google Cloud/Firebase
+- production release-readiness gate
+
+HomeStock is **not yet a public production release**. The remaining blockers are primarily real Firebase/EAS/App Check/provider/store configuration, physical-device verification, legal placeholders and store assets. See `docs/PRODUCTION_RELEASE.md` for the go/no-go checklist.
 
 ## Stack
 
 - Expo SDK 57
 - React Native 0.86
 - React 19.2
-- TypeScript 6 strict mode
+- TypeScript strict mode
 - React Navigation 7
 - Firebase Authentication
 - Cloud Firestore
@@ -45,6 +80,7 @@ be completed in a connected development environment.
 - Expo Notifications
 - React Hook Form + Zod
 - EAS Build
+- Groq API from server-side Cloud Functions only
 
 ## Install
 
@@ -53,30 +89,27 @@ npm install
 npm --prefix functions install
 ```
 
-## Firebase
+> Repository hardening note: root and Functions npm lockfiles still need to be generated from the committed manifests in a normal npm-connected development environment. Once committed, CI/deploy installs should switch to `npm ci`. Do not hand-author lockfiles.
 
-Create three Firebase projects (recommended):
+## Firebase configuration
 
-- `household-app-dev`
-- `household-app-staging`
-- `household-app-prod`
+The checked-in `.firebaserc` currently contains placeholder development/staging/production aliases. Replace them with real Firebase project IDs before deployment.
 
-If those IDs are unavailable, change `.firebaserc`.
-
-In the development project enable:
+For each required environment configure at minimum:
 
 - Authentication → Email/Password
 - Cloud Firestore
 - Cloud Functions
+- Cloud Scheduler for scheduled Expo receipt processing
+- App Check as described in the production runbook
 
-Create a Firebase Web App, then:
+Create the client Firebase app configuration, then:
 
 ```bash
 cp .env.example .env
 ```
 
-Fill the Firebase values in `.env`. Never commit `.env`, service-account keys, APNs credentials or
-other private secrets.
+Fill the Firebase values in `.env`. Never commit `.env`, service-account keys, Groq API keys, Expo tokens, APNs/FCM credentials, signing credentials or generated Google auth credential files.
 
 ## Local Firebase emulators
 
@@ -90,15 +123,14 @@ With:
 EXPO_PUBLIC_USE_FIREBASE_EMULATORS=true
 ```
 
-Ports:
+Default ports:
 
 - Auth `9099`
 - Firestore `8080`
 - Functions `5001`
 - Emulator UI `4000`
 
-For a physical device on the same LAN, set `EXPO_PUBLIC_FIREBASE_EMULATOR_HOST` to the development
-machine's LAN IP.
+For a physical device on the same LAN, set `EXPO_PUBLIC_FIREBASE_EMULATOR_HOST` to the development machine's LAN IP.
 
 ## Start mobile app
 
@@ -106,8 +138,7 @@ machine's LAN IP.
 npm start
 ```
 
-For camera-only testing, Expo Go may be sufficient. For remote push notification testing use an Expo
-development build.
+For remote push notification testing use an Expo development build rather than relying on Expo Go.
 
 ## EAS development build
 
@@ -119,7 +150,7 @@ eas build --profile development --platform ios
 eas build --profile development --platform android
 ```
 
-`eas init` writes/links the EAS project ID used by Expo Push Tokens. Do not invent that UUID manually.
+`eas init` links the real EAS project and writes the project ID used by Expo services. Do not invent that UUID manually.
 
 ## Verification
 
@@ -128,10 +159,11 @@ npm run typecheck
 npm run lint
 npm test
 npm run functions:build
+npm run test:functions
 npm run test:rules
 ```
 
-The GitHub Actions workflow runs the same core checks plus the Firestore emulator rules suite.
+GitHub CI executes the full application/backend verification. The Security workflow separately runs CodeQL and production dependency audits.
 
 ## Key data layout
 
@@ -145,27 +177,54 @@ households/{householdId}
   shoppingList/{itemId}
   purchases/{purchaseId}
   priceHistory/{priceHistoryId}
+  expenses/{expenseId}
+  settlements/{settlementId}
+  budgets/{period}
+  aiInsights/{period}
   activities/{activityId}
   categories/{categoryId}
 
 inviteCodes/{inviteCode}
+aiUsage/{userId_day}
+pushReceipts/{expoTicketId}
 ```
 
-## Important backend operations
+## Important callable Functions
 
-Callable Functions:
+Household/inventory:
 
 - `createHousehold`
 - `joinHousehold`
-- `purchaseShoppingListItem`
 - `regenerateInviteCode`
 - `removeHouseholdMember`
 - `changeHouseholdMemberRole`
+- `transferHouseholdOwnership`
+- `leaveHousehold`
+- `deleteHousehold`
+- `deleteAccount`
+- `adjustInventoryQuantity`
+- `purchaseShoppingListItem`
 
-Firestore triggers build activity events and selected push notifications.
+Finance/AI:
+
+- `createHouseholdExpense`
+- `upsertMonthlyBudget`
+- `recordExpenseSettlement`
+- `suggestExpenseCategory`
+- `analyzeHouseholdBillText`
+- `generateHouseholdAiInsights`
+
+Firestore/scheduled triggers create activity notifications and process Expo push receipts.
+
+## Security notes
+
+- Do not turn on production App Check enforcement until real staging iOS/Android builds have proven valid attestation tokens; the release gate intentionally blocks production while callables contain `enforceAppCheck: false`.
+- Do not use `npm audit fix --force` just to silence transitive framework advisories.
+- Do not add client-side direct writes for collections intentionally marked backend-only in Firestore Rules.
+- Money is represented as integer cents and sensitive concurrent mutations use server-side transactions.
+
+See `SECURITY.md` for vulnerability reporting and `docs/SECURITY_REVIEW_2026-08-11.md` for the current review findings.
 
 ## Next work
 
-See `docs/ROADMAP.md`. The immediate priority is dependency-aware build/test verification in a normal
-networked development environment, followed by callable integration tests, App Check, resilience,
-accessibility/device QA and release preparation.
+See `docs/ROADMAP.md`. The next release-oriented priorities are npm lockfile reproducibility, non-AI abuse/rate controls, real Firebase/EAS provisioning, staging App Check, live provider/device smoke testing, accessibility/device QA and store release preparation.
