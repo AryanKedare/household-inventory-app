@@ -1,7 +1,8 @@
 # Implementation Roadmap
 
 This repository follows `docs/PRODUCT_REQUIREMENTS.md`, with security and transaction work moved
-forward so later UI phases do not rely on an unsafe data model.
+forward so later UI phases do not rely on an unsafe data model. The product scope now also includes
+household-wide finance, budgeting, shared-expense settlement and AI-assisted financial analysis.
 
 ## Implemented in the current build
 
@@ -35,13 +36,29 @@ forward so later UI phases do not rely on an unsafe data model.
 - backend household push fan-out from activity events
 - Expo push ticket persistence, scheduled receipt checks, and `DeviceNotRegistered` token cleanup
 - live dashboard inventory/shopping/monthly-spend/store/price insights
-- Firestore tenant-isolation/security rules
+- household-wide finance categories beyond groceries
+- trusted shared-expense creation with payer/participant membership validation
+- deterministic Go Dutch split engine for direct subtotals and itemized shared lines
+- proportional bill-level discount and fee/tax allocation with exact cent reconciliation
+- per-expense debts showing who owes the payer and how much
+- owner/admin monthly household budgets with optional category limits
+- Finance tab with monthly spend, budget status, category totals, recent expenses and personal debt visibility
+- Firestore tenant-isolation/security rules including backend-only finance writes
 - emulator security-rule tests
 - Cloud Functions emulator integration coverage for ownership transfer and leave
 - Cloud Functions emulator integration coverage for household create/join/purchase, repeat-purchase rejection, and outsider denial
+- Cloud Functions emulator integration coverage for finance splits, outsider participants and budget permissions
 - GitHub Actions verification workflow
 
 ## Still required before production release
+
+### Finance and AI
+
+- settlement/repayment recording so debts can be marked partially or fully paid
+- Groq-backed expense categorization and household spending insights
+- AI bill assistant for pasted receipt/bill text with user review before saving
+- optional receipt image OCR after the text-assisted flow is stable
+- AI response caching/rate controls and privacy/data-retention configuration
 
 ### Hardening
 
@@ -49,7 +66,7 @@ forward so later UI phases do not rely on an unsafe data model.
 - add concurrency tests for two users purchasing/updating the same item
 - extend Firestore rule tests to every allowed/denied field mutation
 - enable Firebase App Check and set `enforceAppCheck: true` in production
-- add rate/abuse controls to invite and administrative callables
+- add rate/abuse controls to invite, finance, AI and administrative callables
 - decide and implement explicit household deletion semantics for a sole owner who wants to remove the household
 
 ### Resilience and UX
@@ -64,14 +81,15 @@ forward so later UI phases do not rely on an unsafe data model.
 
 ### Product completion
 
-- optional custom categories UI
+- optional custom inventory categories UI
 - optional multiple-household switching
-- expiry tracking/receipt OCR/AI suggestions only after MVP, per product requirements
+- expiry tracking/recipes/advanced analytics/widgets only after the production baseline is stable
 
 ### Release
 
 - create/link Firebase dev/staging/prod projects
 - create/link EAS project and inject generated project ID
+- configure Groq API secret and production data-retention controls
 - configure APNs and FCM credentials
 - deploy the scheduled Expo receipt processor with Cloud Scheduler available in the Firebase project
 - add final icon/splash assets

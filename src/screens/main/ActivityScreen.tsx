@@ -40,6 +40,16 @@ function activityCopy(activity: Activity): { title: string; detail: string; icon
         icon: '✓',
       };
     }
+    case 'expense_created': {
+      const title = typeof metadata.title === 'string' ? metadata.title : 'Household expense';
+      const merchant = typeof metadata.merchantName === 'string' ? metadata.merchantName : null;
+      const total = typeof metadata.totalPaidCents === 'number' ? formatMoney(metadata.totalPaidCents) : null;
+      return {
+        title: `${title} recorded`,
+        detail: [merchant, total].filter(Boolean).join(' · ') || 'Household finance updated',
+        icon: '€',
+      };
+    }
     case 'member_joined': {
       const displayName = typeof metadata.displayName === 'string' ? metadata.displayName : 'A member';
       return { title: `${displayName} joined`, detail: 'Joined the household', icon: '👤' };
@@ -119,7 +129,7 @@ export function ActivityScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>No activity yet</Text>
-            <Text style={styles.emptyText}>Inventory and shopping activity will appear here.</Text>
+            <Text style={styles.emptyText}>Inventory, shopping and finance activity will appear here.</Text>
           </View>
         }
       />

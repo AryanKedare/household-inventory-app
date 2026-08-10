@@ -4,6 +4,27 @@ export type HouseholdRole = 'owner' | 'admin' | 'member';
 export type ItemStatus = 'available' | 'low_stock' | 'out_of_stock';
 export type ShoppingItemStatus = 'active' | 'purchasing' | 'purchased' | 'removed';
 export type ShoppingPriority = 'normal' | 'important' | 'urgent';
+export type ExpenseCategoryId =
+  | 'groceries'
+  | 'dining_out'
+  | 'rent_mortgage'
+  | 'utilities'
+  | 'household_supplies'
+  | 'transport_commute'
+  | 'fuel'
+  | 'public_transport'
+  | 'electronics'
+  | 'furniture_home'
+  | 'subscriptions'
+  | 'entertainment'
+  | 'health'
+  | 'insurance'
+  | 'childcare'
+  | 'travel'
+  | 'maintenance_repairs'
+  | 'pets'
+  | 'shared_personal'
+  | 'other';
 
 export interface UserProfile {
   id: string;
@@ -114,6 +135,58 @@ export interface PriceHistory {
   createdAt: Timestamp;
 }
 
+export interface ExpenseAllocation {
+  userId: string;
+  subtotalCents: number;
+  discountShareCents: number;
+  feeShareCents: number;
+  owedCents: number;
+}
+
+export interface ExpenseDebt {
+  fromUserId: string;
+  toUserId: string;
+  amountCents: number;
+  settledCents?: number;
+}
+
+export interface HouseholdExpense {
+  id: string;
+  title: string;
+  merchantName?: string | null;
+  categoryId: ExpenseCategoryId;
+  categorySource: 'manual' | 'ai' | 'inventory';
+  categoryConfidence?: number | null;
+  paidBy: string;
+  paidByName: string;
+  participantIds: string[];
+  participantSubtotals: Array<{ userId: string; subtotalCents: number }>;
+  lineItems: Array<{ description: string; totalCents: number; participantIds: string[] }>;
+  subtotalCents: number;
+  discountCents: number;
+  feeCents: number;
+  totalPaidCents: number;
+  allocations: ExpenseAllocation[];
+  debts: ExpenseDebt[];
+  currency: string;
+  expenseDate: Timestamp;
+  notes?: string | null;
+  createdBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface MonthlyBudget {
+  id: string;
+  period: string;
+  currency: string;
+  totalLimitCents: number;
+  categoryLimitsCents: Partial<Record<ExpenseCategoryId, number>>;
+  updatedBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export type ActivityType =
   | 'item_created'
   | 'item_updated'
@@ -122,6 +195,7 @@ export type ActivityType =
   | 'shopping_item_added'
   | 'shopping_item_removed'
   | 'item_purchased'
+  | 'expense_created'
   | 'member_joined'
   | 'member_removed'
   | 'member_left'

@@ -120,6 +120,16 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      match /expenses/{expenseId} {
+        allow read: if isMember(householdId);
+        allow write: if false; // Expense math and debt creation are trusted backend operations.
+      }
+
+      match /budgets/{period} {
+        allow read: if isMember(householdId);
+        allow write: if false; // Budget changes use the admin callable.
+      }
+
       match /activities/{activityId} {
         allow read: if isMember(householdId);
         allow write: if false;

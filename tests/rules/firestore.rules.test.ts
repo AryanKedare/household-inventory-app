@@ -208,6 +208,44 @@ test('client cannot create purchase history directly', async () => {
   );
 });
 
+test('finance records are member-readable but backend-write-only', async () => {
+  await testEnv.clearFirestore();
+  await seedHousehold();
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'households', 'home-a', 'expenses', 'expense-1'), {
+      title: 'Dinner',
+      totalPaidCents: 5000,
+      categoryId: 'dining_out',
+    });
+    await setDoc(doc(db, 'households', 'home-a', 'budgets', '2026-08'), {
+      period: '2026-08',
+      totalLimitCents: 100000,
+    });
+  });
+
+  const memberDb = testEnv.authenticatedContext('member-a').firestore();
+  await assertSucceeds(getDoc(doc(memberDb, 'households', 'home-a', 'expenses', 'expense-1')));
+  await assertSucceeds(getDoc(doc(memberDb, 'households', 'home-a', 'budgets', '2026-08')));
+  await assertFails(
+    setDoc(doc(memberDb, 'households', 'home-a', 'expenses', 'forged'), {
+      title: 'Forged expense',
+      totalPaidCents: 1,
+    }),
+  );
+  await assertFails(
+    setDoc(doc(memberDb, 'households', 'home-a', 'budgets', '2026-09'), {
+      period: '2026-09',
+      totalLimitCents: 1,
+    }),
+  );
+
+  const outsiderDb = testEnv.authenticatedContext('outsider').firestore();
+  await assertFails(getDoc(doc(outsiderDb, 'households', 'home-a', 'expenses', 'expense-1')));
+  await assertFails(getDoc(doc(outsiderDb, 'households', 'home-a', 'budgets', '2026-08')));
+});
+
 test('push receipt queue is inaccessible to signed-in clients', async () => {
   await testEnv.clearFirestore();
   await seedHousehold();

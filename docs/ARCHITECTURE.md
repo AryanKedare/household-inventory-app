@@ -5,12 +5,13 @@
 1. Firestore household data is tenant-scoped below `households/{householdId}`.
 2. A signed-in user is not automatically authorized for a household.
 3. Membership is proven by `households/{householdId}/members/{uid}`.
-4. Privileged membership operations are callable Cloud Functions.
+4. Privileged membership, finance and settlement operations are callable Cloud Functions.
 5. Money is stored in integer minor units (EUR cents), never floating-point database values.
-6. Critical multi-document purchase flows are atomic/transactional.
+6. Critical multi-document purchase and shared-expense flows are atomic/transactional.
 7. Firestore Security Rules ship with each feature and are emulator-tested.
 8. The client is never the only validation boundary for privileged writes.
 9. Audit/history records that affect trust are backend-written.
+10. AI may classify, extract and explain financial data, but authoritative money allocation is deterministic server code.
 
 ## Mobile layers
 
@@ -54,6 +55,8 @@ households/{householdId}
   shoppingList/{itemId}
   purchases/{purchaseId}
   priceHistory/{priceHistoryId}
+  expenses/{expenseId}
+  budgets/{yyyy-mm}
   activities/{activityId}
   categories/{categoryId}
 
@@ -88,12 +91,50 @@ read or write this collection.
 
 Clients cannot directly write purchases, price history or activity records.
 
+## Household finance and Go Dutch
+
+Household finance is a separate domain from inventory. It covers groceries, dining out, rent/mortgage,
+utilities, household supplies, commute/transport, fuel, public transport, electronics, furniture/home,
+subscriptions, entertainment, health, insurance, childcare, travel, repairs, pets, shared personal
+spending and other household costs.
+
+`createHouseholdExpense` accepts exactly one of:
+
+- per-person pre-discount subtotals, or
+- itemized expense lines assigned to one or more household members.
+
+The trusted backend then:
+
+1. authenticates the actor
+2. validates the payer and every participant inside the same Firestore transaction
+3. calculates the pre-discount subtotal
+4. allocates a bill-level discount proportionally by each participant's pre-discount spend
+5. allocates bill-level tax/fees proportionally using the same weights
+6. uses deterministic largest-remainder cent allocation with integer arithmetic
+7. verifies every allocated cent reconciles exactly to the amount actually paid
+8. creates per-person allocations and debts to the payer
+9. writes the expense and activity atomically
+
+The mobile client displays these allocations but cannot directly write expense/debt records. This
+prevents a client or AI suggestion from changing who owes what without the trusted calculation path.
+
+Monthly budgets live at `budgets/{yyyy-mm}` and can include an overall household limit plus optional
+limits for any household finance category. Only owners/admins can change budgets through the trusted
+callable; all household members can read them.
+
+## AI boundary
+
+The finance schema is intentionally ready for AI-assisted categorization and household insights.
+The AI layer may suggest categories, extract receipt/bill line items, suggest participant assignment,
+and summarize aggregate spending. AI output is advisory and must be validated before persistence.
+Discount, fee, share and debt calculations remain deterministic server-side code.
+
 ## Activity and notifications
 
-Inventory/shopping Firestore triggers create structured activity documents. Purchase operations
-create their activity inside the purchase transaction. An activity-create trigger builds selected
-household notifications and sends them to enabled per-device Expo push tokens, excluding the actor
-where possible.
+Inventory/shopping Firestore triggers create structured activity documents. Purchase and household
+expense operations create their activity inside their trusted transaction. An activity-create trigger
+builds selected household notifications and sends them to enabled per-device Expo push tokens,
+excluding the actor where possible.
 
 Accepted Expo push tickets are stored in `pushReceipts/{expoTicketId}`. A scheduled Cloud Function
 checks due receipts after the delivery window. Successful receipts are removed. A
@@ -114,7 +155,8 @@ Firestore rules currently:
 - deny direct household/member role writes
 - validate inventory quantity/status/price/audit ownership
 - validate active shopping-list item structure and linked inventory existence
-- deny client writes to purchases, price history and activities
+- deny client writes to purchases, price history, household expenses, budgets and activities
+- deny outsiders access to household finance records
 - deny all client access to invite-code lookup documents
 - deny all client access to Expo push-receipt queue documents
 
