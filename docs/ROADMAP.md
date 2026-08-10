@@ -25,7 +25,7 @@ forward so later UI phases do not rely on an unsafe data model.
 - shared shopping list with duplicate-document prevention
 - category-grouped shopping UI and estimated total
 - trusted `purchaseShoppingListItem` Cloud Function transaction
-- purchase store, quantity, unit price and total price capture
+- purchase store, quantity, unit price, total price, and editable purchase date capture
 - inventory replenishment after purchase
 - price change calculation/history
 - purchase and price history UI

@@ -93,7 +93,7 @@ export function ShoppingListScreen() {
         quantityPurchased: value.quantityPurchased,
         unitPriceCents: value.unitPriceCents,
         storeName: value.storeName,
-        purchasedAt: new Date().toISOString(),
+        purchasedAt: value.purchasedAt,
       });
     } catch (purchaseError) {
       throw new Error(toUserMessage(purchaseError));
