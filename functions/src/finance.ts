@@ -1,6 +1,7 @@
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
+import { EXPENSE_CATEGORY_IDS, EXPENSE_CATEGORY_SET, type ExpenseCategoryId } from './financeCategories';
 import {
   calculateExpenseSplit,
   participantSubtotalsFromLines,
@@ -10,32 +11,6 @@ import {
 
 const db = getFirestore();
 const REGION = 'europe-west1';
-
-export const EXPENSE_CATEGORY_IDS = [
-  'groceries',
-  'dining_out',
-  'rent_mortgage',
-  'utilities',
-  'household_supplies',
-  'transport_commute',
-  'fuel',
-  'public_transport',
-  'electronics',
-  'furniture_home',
-  'subscriptions',
-  'entertainment',
-  'health',
-  'insurance',
-  'childcare',
-  'travel',
-  'maintenance_repairs',
-  'pets',
-  'shared_personal',
-  'other',
-] as const;
-
-type ExpenseCategoryId = (typeof EXPENSE_CATEGORY_IDS)[number];
-const EXPENSE_CATEGORY_SET = new Set<string>(EXPENSE_CATEGORY_IDS);
 
 interface CreateHouseholdExpenseRequest {
   householdId?: unknown;
