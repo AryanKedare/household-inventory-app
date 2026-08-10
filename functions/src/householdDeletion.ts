@@ -39,7 +39,50 @@ export const deleteHousehold = onCall<DeleteHouseholdRequest>(
     const lockResult = await db.runTransaction(async (transaction) => {
       const householdSnapshot = await transaction.get(householdRef);
       if (!householdSnapshot.exists) {
-        return { alreadyDeleted: true, inviteCode: null as string | null };
+        return { alreadyDeleted: true };
+      }
+
+      const household = householdSnapshot.data() ?? {};
+      const inviteCode =
+        typeof household.inviteCode === 'string' && household.inviteCode.length > 0
+          ? household.inviteCode
+          : null;
+      const inviteRef = inviteCode ? db.doc(`inviteCodes/${inviteCode}`) : null;
+
+      // A recursive delete can remove child documents before the household root.
+      // Once deletion is locked, only the user who acquired that lock may resume it;
+      // requiring the owner membership again would make a legitimate retry impossible
+      // if that membership was one of the children already removed.
+      if (household.deleting === true) {
+        if (household.deletionStartedBy !== uid) {
+          throw new HttpsError(
+            'permission-denied',
+            'Household deletion is already in progress by another user.',
+          );
+        }
+
+        const inviteSnapshot = inviteRef ? await transaction.get(inviteRef) : null;
+        const userSnapshot = await transaction.get(userRef);
+
+        if (inviteRef && inviteSnapshot?.exists) {
+          transaction.delete(inviteRef);
+        }
+        if (userSnapshot.exists && userSnapshot.data()?.defaultHouseholdId === householdId) {
+          transaction.update(userRef, {
+            defaultHouseholdId: FieldValue.delete(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+        transaction.set(
+          householdRef,
+          {
+            deletionRetryAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        return { alreadyDeleted: false };
       }
 
       const ownerSnapshot = await transaction.get(ownerRef);
@@ -55,12 +98,6 @@ export const deleteHousehold = onCall<DeleteHouseholdRequest>(
         );
       }
 
-      const household = householdSnapshot.data();
-      const inviteCode =
-        typeof household?.inviteCode === 'string' && household.inviteCode.length > 0
-          ? household.inviteCode
-          : null;
-      const inviteRef = inviteCode ? db.doc(`inviteCodes/${inviteCode}`) : null;
       const inviteSnapshot = inviteRef ? await transaction.get(inviteRef) : null;
       const userSnapshot = await transaction.get(userRef);
 
@@ -84,7 +121,7 @@ export const deleteHousehold = onCall<DeleteHouseholdRequest>(
         { merge: true },
       );
 
-      return { alreadyDeleted: false, inviteCode };
+      return { alreadyDeleted: false };
     });
 
     if (lockResult.alreadyDeleted) {
