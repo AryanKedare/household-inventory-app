@@ -29,7 +29,7 @@ Updated: 10 August 2026
 
 ## Verification completed in GitHub Actions
 
-The CI pipeline has successfully completed the following checks on merged application/lifecycle changes:
+The CI pipeline has successfully completed:
 
 - mobile dependency installation
 - Cloud Functions dependency installation
@@ -37,14 +37,16 @@ The CI pipeline has successfully completed the following checks on merged applic
 - ESLint
 - unit tests
 - Cloud Functions TypeScript build
-- Auth + Firestore + Cloud Functions emulator integration test for ownership transfer and leave
+- Auth + Firestore + Cloud Functions emulator integration tests
 - Firestore Security Rules emulator tests
 
-The lifecycle integration test verifies that an owner cannot leave an ownerless household, ownership can be transferred atomically, the previous owner becomes an admin, the new owner is promoted, the previous owner can then leave, their default household is cleared, and lifecycle activity records are created.
+The lifecycle integration suite verifies that an owner cannot leave an ownerless household, ownership can be transferred atomically, the previous owner becomes an admin, the new owner is promoted, the previous owner can then leave, their default household is cleared, and lifecycle activity records are created.
+
+The core callable integration suite verifies invalid invite rejection, household creation, invite joining, repeat joining, owner/member/default-household records, transactional purchase, inventory replenishment, purchase and price history, repeat-purchase rejection, and non-member purchase denial.
 
 Purchase date input has unit coverage for stable `YYYY-MM-DD` formatting/parsing and rejects malformed or impossible calendar dates before the request reaches the backend.
 
-The push-receipt branch adds a Firestore rule regression test proving signed-in clients cannot access the backend receipt queue. Full branch verification is performed by the pull-request CI before merge.
+Push receipt handling compiles as part of the Cloud Functions build, loads successfully in the Functions emulator suite, and has Firestore rule coverage proving signed-in clients cannot access the backend receipt queue.
 
 ## External setup still required
 
@@ -59,7 +61,7 @@ The push-receipt branch adds a Firestore rule regression test proving signed-in 
 
 - Explicit delete-household flow for a sole owner who wants to remove the household entirely
 - App Check enablement and enforcement before production
-- Integration coverage for create/join/purchase and concurrency-sensitive flows
+- Concurrency coverage for simultaneous purchase/inventory updates
 - Broader Cloud Functions and Firestore rule branch coverage
 - Offline UX and retry/pending-state polish
 - Accessibility/device QA, store assets, privacy policy/data-safety disclosures, TestFlight/Play closed testing
