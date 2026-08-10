@@ -131,26 +131,20 @@ export function SettingsScreen() {
   }
 
   function confirmTransferOwnership(member: HouseholdMember) {
-    if (!householdId) {
+    if (!householdId || member.role === 'owner') {
       return;
     }
-
-    const memberName = member.displayName || member.email;
     Alert.alert(
       'Transfer household ownership?',
-      `${memberName} will become the owner. You will remain in the household as an admin.`,
+      `${member.displayName || member.email} will become the owner and you will become an admin.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Transfer',
+          text: 'Transfer ownership',
           onPress: () => {
-            const busyId = `transfer:${member.userId}`;
-            setAdminBusyId(busyId);
+            setAdminBusyId(`transfer-${member.userId}`);
             void householdService
               .transferHouseholdOwnership(householdId, member.userId)
-              .then(() => {
-                Alert.alert('Ownership transferred', `${memberName} is now the household owner.`);
-              })
               .catch((error) => Alert.alert('Could not transfer ownership', toUserMessage(error)))
               .finally(() => setAdminBusyId(null));
           },
@@ -163,31 +157,60 @@ export function SettingsScreen() {
     if (!householdId) {
       return;
     }
-
     if (householdDetails.currentRole === 'owner') {
       Alert.alert(
         'Transfer ownership first',
-        'The household owner cannot leave until another member has been made owner.',
+        'A household must always have an owner. Transfer ownership to another member before leaving.',
       );
       return;
     }
-
     Alert.alert(
       'Leave household?',
-      'You will lose access to this household inventory, shopping list, history, and activity.',
+      'You will lose access to this household. You can join again later with a valid invite code.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Leave',
+          text: 'Leave household',
           style: 'destructive',
           onPress: () => {
             setAdminBusyId('leave');
             void householdService
               .leaveHousehold(householdId)
-              .catch((error) => {
-                setAdminBusyId(null);
-                Alert.alert('Could not leave household', toUserMessage(error));
-              });
+              .catch((error) => Alert.alert('Could not leave household', toUserMessage(error)))
+              .finally(() => setAdminBusyId(null));
+          },
+        },
+      ],
+    );
+  }
+
+  function confirmDeleteHousehold() {
+    if (!householdId || !householdDetails.household) {
+      return;
+    }
+    if (householdDetails.currentRole !== 'owner' || householdDetails.members.length !== 1) {
+      Alert.alert(
+        'Household cannot be deleted yet',
+        'Transfer ownership or remove every other member before deleting the household.',
+      );
+      return;
+    }
+
+    const householdName = householdDetails.household.name;
+    Alert.alert(
+      'Delete household permanently?',
+      `This permanently deletes ${householdName}, including inventory, shopping history, purchases, expenses, budgets, Go Dutch settlements, and AI insights. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete permanently',
+          style: 'destructive',
+          onPress: () => {
+            setAdminBusyId('delete-household');
+            void householdService
+              .deleteHousehold(householdId)
+              .catch((error) => Alert.alert('Could not delete household', toUserMessage(error)))
+              .finally(() => setAdminBusyId(null));
           },
         },
       ],
@@ -227,7 +250,6 @@ export function SettingsScreen() {
                 title="Regenerate"
                 variant="secondary"
                 loading={adminBusyId === 'invite'}
-                disabled={adminBusyId !== null && adminBusyId !== 'invite'}
                 onPress={() => void regenerateInvite()}
                 style={styles.smallButton}
               />
@@ -250,7 +272,6 @@ export function SettingsScreen() {
               (householdDetails.currentRole === 'admin' && member.role === 'member'));
           const canChangeRole = isOwner && !isSelf && member.role !== 'owner';
           const canTransferOwnership = isOwner && !isSelf && member.role !== 'owner';
-          const transferBusyId = `transfer:${member.userId}`;
 
           return (
             <View
@@ -266,22 +287,22 @@ export function SettingsScreen() {
                 <Text style={styles.role}>{member.role.toUpperCase()}</Text>
               </View>
               <View style={styles.memberActions}>
-                {canTransferOwnership ? (
-                  <AppButton
-                    title="Make owner"
-                    variant="secondary"
-                    loading={adminBusyId === transferBusyId}
-                    disabled={adminBusyId !== null && adminBusyId !== transferBusyId}
-                    onPress={() => confirmTransferOwnership(member)}
-                    style={styles.memberButton}
-                  />
-                ) : null}
                 {canChangeRole ? (
                   <AppButton
                     title={member.role === 'admin' ? 'Make member' : 'Make admin'}
                     variant="secondary"
                     disabled={adminBusyId !== null}
                     onPress={() => void toggleRole(member)}
+                    style={styles.memberButton}
+                  />
+                ) : null}
+                {canTransferOwnership ? (
+                  <AppButton
+                    title="Make owner"
+                    variant="secondary"
+                    disabled={adminBusyId !== null}
+                    loading={adminBusyId === `transfer-${member.userId}`}
+                    onPress={() => confirmTransferOwnership(member)}
                     style={styles.memberButton}
                   />
                 ) : null}
@@ -298,23 +319,6 @@ export function SettingsScreen() {
             </View>
           );
         })}
-      </AppCard>
-
-      <AppCard style={styles.card}>
-        <Text style={styles.sectionLabel}>HOUSEHOLD ACCESS</Text>
-        <Text style={styles.settingTitle}>Leave this household</Text>
-        <Text style={styles.settingDescription}>
-          {isOwner
-            ? 'Transfer ownership to another member before leaving. Owners cannot leave an ownerless household.'
-            : 'Leaving removes your access. Your account stays active and you can create or join another household.'}
-        </Text>
-        <AppButton
-          title="Leave household"
-          variant="danger"
-          loading={adminBusyId === 'leave'}
-          disabled={adminBusyId !== null || isOwner}
-          onPress={confirmLeaveHousehold}
-        />
       </AppCard>
 
       <AppCard style={styles.card}>
@@ -361,6 +365,49 @@ export function SettingsScreen() {
           />
         )}
       </AppCard>
+
+      <AppCard style={styles.card}>
+        <Text style={styles.sectionLabel}>HOUSEHOLD ACCESS</Text>
+        <Text style={styles.settingTitle}>Leave household</Text>
+        <Text style={styles.settingDescription}>
+          {isOwner
+            ? householdDetails.members.length > 1
+              ? 'Transfer ownership to another member before leaving the household.'
+              : 'You are the only member. Delete the household if you no longer need it.'
+            : 'Leaving removes your access but does not delete household data for the remaining members.'}
+        </Text>
+        {!isOwner ? (
+          <AppButton
+            title="Leave household"
+            variant="danger"
+            loading={adminBusyId === 'leave'}
+            disabled={adminBusyId !== null && adminBusyId !== 'leave'}
+            onPress={confirmLeaveHousehold}
+          />
+        ) : null}
+      </AppCard>
+
+      {isOwner ? (
+        <AppCard style={styles.card}>
+          <Text style={styles.sectionLabel}>DANGER ZONE</Text>
+          <Text style={styles.settingTitle}>Delete household</Text>
+          <Text style={styles.settingDescription}>
+            {householdDetails.members.length === 1
+              ? 'Permanently delete this household and all inventory, shopping, finance, settlement, and AI data.'
+              : 'Remove every other member or transfer ownership before this household can be deleted.'}
+          </Text>
+          <AppButton
+            title="Delete household permanently"
+            variant="danger"
+            loading={adminBusyId === 'delete-household'}
+            disabled={
+              householdDetails.members.length !== 1 ||
+              (adminBusyId !== null && adminBusyId !== 'delete-household')
+            }
+            onPress={confirmDeleteHousehold}
+          />
+        </AppCard>
+      ) : null}
 
       <AppButton title="Sign out" variant="secondary" onPress={() => void signOut()} />
     </Screen>

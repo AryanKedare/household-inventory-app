@@ -73,14 +73,13 @@ export async function changeHouseholdMemberRole(
 
 export async function transferHouseholdOwnership(
   householdId: string,
-  userId: string,
-): Promise<{ ownerId: string }> {
+  targetUserId: string,
+): Promise<void> {
   const call = httpsCallable<
-    { householdId: string; userId: string },
-    { success: boolean; ownerId: string }
+    { householdId: string; targetUserId: string },
+    { success: boolean; previousOwnerId: string; newOwnerId: string }
   >(requireFunctions(), 'transferHouseholdOwnership');
-  const result = await call({ householdId, userId });
-  return { ownerId: result.data.ownerId };
+  await call({ householdId, targetUserId });
 }
 
 export async function leaveHousehold(householdId: string): Promise<void> {
@@ -88,5 +87,13 @@ export async function leaveHousehold(householdId: string): Promise<void> {
     requireFunctions(),
     'leaveHousehold',
   );
+  await call({ householdId });
+}
+
+export async function deleteHousehold(householdId: string): Promise<void> {
+  const call = httpsCallable<
+    { householdId: string },
+    { success: boolean; alreadyDeleted: boolean }
+  >(requireFunctions(), 'deleteHousehold');
   await call({ householdId });
 }
