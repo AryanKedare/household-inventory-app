@@ -97,7 +97,7 @@ function cleanMoney(value: unknown, fieldName: string): number {
   if (value === undefined || value === null) {
     return 0;
   }
-  if (!Number.isInteger(value) || (value as number) < 0 || (value as number) > 100_000_000) {
+  if (!Number.isSafeInteger(value) || (value as number) < 0 || (value as number) > 100_000_000) {
     throw new HttpsError('invalid-argument', `${fieldName} must be a non-negative amount in cents.`);
   }
   return value as number;
@@ -171,29 +171,6 @@ function cleanLineItems(value: unknown): ExpenseLineInput[] | null {
   });
 }
 
-async function requireHouseholdMembers(
-  householdId: string,
-  userIds: string[],
-): Promise<Map<string, Record<string, unknown>>> {
-  const uniqueIds = [...new Set(userIds)];
-  if (uniqueIds.length === 0 || uniqueIds.length > 20) {
-    throw new HttpsError('invalid-argument', 'Expense participants are invalid.');
-  }
-
-  const snapshots = await Promise.all(
-    uniqueIds.map((userId) => db.doc(`households/${householdId}/members/${userId}`).get()),
-  );
-  const members = new Map<string, Record<string, unknown>>();
-  snapshots.forEach((snapshot, index) => {
-    const userId = uniqueIds[index];
-    if (!userId || !snapshot.exists) {
-      throw new HttpsError('failed-precondition', 'Every payer and participant must belong to the household.');
-    }
-    members.set(userId, snapshot.data() ?? {});
-  });
-  return members;
-}
-
 export const createHouseholdExpense = onCall<CreateHouseholdExpenseRequest>(
   { region: REGION, enforceAppCheck: false },
   async (request) => {
@@ -227,22 +204,9 @@ export const createHouseholdExpense = onCall<CreateHouseholdExpenseRequest>(
       );
     }
 
-    const actorSnapshot = await db.doc(`households/${householdId}/members/${uid}`).get();
-    if (!actorSnapshot.exists) {
-      throw new HttpsError('permission-denied', 'You are not a member of this household.');
-    }
-
-    const allUserIds = [paidBy, ...participantSubtotals.map(({ userId }) => userId)];
-    const members = await requireHouseholdMembers(householdId, allUserIds);
-
     let split;
     try {
-      split = calculateExpenseSplit({
-        paidBy,
-        participantSubtotals,
-        discountCents,
-        feeCents,
-      });
+      split = calculateExpenseSplit({ paidBy, participantSubtotals, discountCents, feeCents });
     } catch (error) {
       throw new HttpsError(
         'invalid-argument',
@@ -252,19 +216,51 @@ export const createHouseholdExpense = onCall<CreateHouseholdExpenseRequest>(
 
     const expenseRef = db.collection(`households/${householdId}/expenses`).doc();
     const activityRef = db.collection(`households/${householdId}/activities`).doc();
+    const householdRef = db.doc(`households/${householdId}`);
     const participantIds = split.allocations.map(({ userId }) => userId);
+    const requiredMemberIds = [...new Set([uid, paidBy, ...participantIds])];
+    const memberRefs = requiredMemberIds.map((userId) =>
+      db.doc(`households/${householdId}/members/${userId}`),
+    );
 
     await db.runTransaction(async (transaction) => {
+      const householdSnapshot = await transaction.get(householdRef);
+      if (!householdSnapshot.exists) {
+        throw new HttpsError('not-found', 'Household no longer exists.');
+      }
+
+      const memberSnapshots = [];
+      for (const memberRef of memberRefs) {
+        memberSnapshots.push(await transaction.get(memberRef));
+      }
+      const memberData = new Map<string, Record<string, unknown>>();
+      memberSnapshots.forEach((snapshot, index) => {
+        const memberId = requiredMemberIds[index];
+        if (!memberId || !snapshot.exists) {
+          throw new HttpsError(
+            'failed-precondition',
+            'Every payer and participant must belong to the household.',
+          );
+        }
+        memberData.set(memberId, snapshot.data() ?? {});
+      });
+      if (!memberData.has(uid)) {
+        throw new HttpsError('permission-denied', 'You are not a member of this household.');
+      }
+
+      const currency =
+        typeof householdSnapshot.data()?.currency === 'string'
+          ? householdSnapshot.data()?.currency
+          : 'EUR';
+      const payerName = memberData.get(paidBy)?.displayName;
+
       transaction.create(expenseRef, {
         title,
         merchantName: merchantName || null,
         categoryId,
         categorySource: 'manual',
         paidBy,
-        paidByName:
-          typeof members.get(paidBy)?.displayName === 'string'
-            ? members.get(paidBy)?.displayName
-            : 'Household member',
+        paidByName: typeof payerName === 'string' ? payerName : 'Household member',
         participantIds,
         participantSubtotals: split.allocations.map(({ userId, subtotalCents }) => ({
           userId,
@@ -277,7 +273,7 @@ export const createHouseholdExpense = onCall<CreateHouseholdExpenseRequest>(
         totalPaidCents: split.totalPaidCents,
         allocations: split.allocations,
         debts: split.debts.map((debt) => ({ ...debt, settledCents: 0 })),
-        currency: 'EUR',
+        currency,
         expenseDate,
         notes: notes || null,
         createdBy: uid,
@@ -350,31 +346,40 @@ export const upsertMonthlyBudget = onCall<UpsertMonthlyBudgetRequest>(
     const categoryLimitsCents = cleanCategoryLimits(request.data.categoryLimits);
 
     const memberRef = db.doc(`households/${householdId}/members/${uid}`);
+    const householdRef = db.doc(`households/${householdId}`);
     const budgetRef = db.doc(`households/${householdId}/budgets/${period}`);
 
     await db.runTransaction(async (transaction) => {
       const memberSnapshot = await transaction.get(memberRef);
+      const householdSnapshot = await transaction.get(householdRef);
+      const budgetSnapshot = await transaction.get(budgetRef);
+
       if (!memberSnapshot.exists) {
         throw new HttpsError('permission-denied', 'You are not a member of this household.');
+      }
+      if (!householdSnapshot.exists) {
+        throw new HttpsError('not-found', 'Household no longer exists.');
       }
       const role = memberSnapshot.data()?.role;
       if (role !== 'owner' && role !== 'admin') {
         throw new HttpsError('permission-denied', 'Only household admins can change budgets.');
       }
-
-      transaction.set(
-        budgetRef,
-        {
-          period,
-          currency: 'EUR',
-          totalLimitCents,
-          categoryLimitsCents,
-          updatedBy: uid,
-          updatedAt: FieldValue.serverTimestamp(),
-          createdAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true },
-      );
+      const currency =
+        typeof householdSnapshot.data()?.currency === 'string'
+          ? householdSnapshot.data()?.currency
+          : 'EUR';
+      const budgetData: Record<string, unknown> = {
+        period,
+        currency,
+        totalLimitCents,
+        categoryLimitsCents,
+        updatedBy: uid,
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      if (!budgetSnapshot.exists) {
+        budgetData.createdAt = FieldValue.serverTimestamp();
+      }
+      transaction.set(budgetRef, budgetData, { merge: true });
     });
 
     return { success: true, period, totalLimitCents, categoryLimitsCents };
