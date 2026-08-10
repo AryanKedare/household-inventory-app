@@ -32,8 +32,10 @@ export interface ExpenseSplitResult {
   debts: ExpenseDebt[];
 }
 
+const MAX_EXPENSE_CENTS = 100_000_000;
+
 function assertMoney(value: number, field: string): void {
-  if (!Number.isInteger(value) || value < 0 || value > 100_000_000) {
+  if (!Number.isSafeInteger(value) || value < 0 || value > MAX_EXPENSE_CENTS) {
     throw new Error(`${field} must be a non-negative integer amount in cents.`);
   }
 }
@@ -51,23 +53,24 @@ function allocateIntegerAmount(
     return result;
   }
 
-  const positive = weights.filter(({ weight }) => Number.isFinite(weight) && weight > 0);
-  const totalWeight = positive.reduce((sum, { weight }) => sum + weight, 0);
-  if (totalWeight <= 0) {
+  const positive = weights.filter(({ weight }) => Number.isSafeInteger(weight) && weight > 0);
+  const totalWeight = positive.reduce((sum, { weight }) => sum + BigInt(weight), 0n);
+  if (totalWeight <= 0n) {
     throw new Error('Cannot allocate a positive amount without positive weights.');
   }
 
   const ranked = positive.map(({ id, weight }) => {
-    const exact = (amountCents * weight) / totalWeight;
-    const base = Math.floor(exact);
-    result.set(id, base);
-    return { id, remainder: exact - base };
+    const numerator = BigInt(amountCents) * BigInt(weight);
+    const base = numerator / totalWeight;
+    const remainder = numerator % totalWeight;
+    result.set(id, Number(base));
+    return { id, remainder };
   });
 
   let remaining = amountCents - [...result.values()].reduce((sum, value) => sum + value, 0);
   ranked.sort((left, right) => {
     if (right.remainder !== left.remainder) {
-      return right.remainder - left.remainder;
+      return right.remainder > left.remainder ? 1 : -1;
     }
     return left.id.localeCompare(right.id);
   });
@@ -112,7 +115,11 @@ export function participantSubtotalsFromLines(lines: ExpenseLineInput[]): Partic
       throw new Error('Every expense line requires a description.');
     }
     for (const share of splitLineEqually(line)) {
-      totals.set(share.userId, (totals.get(share.userId) ?? 0) + share.subtotalCents);
+      const next = (totals.get(share.userId) ?? 0) + share.subtotalCents;
+      if (!Number.isSafeInteger(next) || next > MAX_EXPENSE_CENTS) {
+        throw new Error('Expense subtotal exceeds the supported maximum.');
+      }
+      totals.set(share.userId, next);
     }
   }
 
@@ -137,10 +144,11 @@ export function calculateExpenseSplit(input: {
       throw new Error('Every participant requires a user ID.');
     }
     assertMoney(participant.subtotalCents, 'Participant subtotal');
-    merged.set(
-      participant.userId,
-      (merged.get(participant.userId) ?? 0) + participant.subtotalCents,
-    );
+    const next = (merged.get(participant.userId) ?? 0) + participant.subtotalCents;
+    if (!Number.isSafeInteger(next) || next > MAX_EXPENSE_CENTS) {
+      throw new Error('Participant subtotal exceeds the supported maximum.');
+    }
+    merged.set(participant.userId, next);
   }
 
   const subtotals = [...merged.entries()]
@@ -153,12 +161,21 @@ export function calculateExpenseSplit(input: {
   }
 
   const subtotalCents = subtotals.reduce((sum, participant) => sum + participant.subtotalCents, 0);
+  if (!Number.isSafeInteger(subtotalCents) || subtotalCents > MAX_EXPENSE_CENTS) {
+    throw new Error('Expense subtotal exceeds the supported maximum.');
+  }
+
   const discountCents = input.discountCents ?? 0;
   const feeCents = input.feeCents ?? 0;
   assertMoney(discountCents, 'Discount');
   assertMoney(feeCents, 'Fees and tax');
   if (discountCents > subtotalCents) {
     throw new Error('Discount cannot exceed the pre-discount subtotal.');
+  }
+
+  const totalPaidCents = subtotalCents - discountCents + feeCents;
+  if (!Number.isSafeInteger(totalPaidCents) || totalPaidCents > MAX_EXPENSE_CENTS) {
+    throw new Error('Paid total exceeds the supported maximum.');
   }
 
   const weights = subtotals.map(({ userId, subtotalCents: weight }) => ({ id: userId, weight }));
@@ -177,7 +194,6 @@ export function calculateExpenseSplit(input: {
     };
   });
 
-  const totalPaidCents = subtotalCents - discountCents + feeCents;
   const allocatedTotal = allocations.reduce((sum, allocation) => sum + allocation.owedCents, 0);
   if (allocatedTotal !== totalPaidCents) {
     throw new Error('Expense allocation did not reconcile to the paid total.');
