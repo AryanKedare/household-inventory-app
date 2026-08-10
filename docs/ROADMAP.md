@@ -43,7 +43,13 @@ household-wide finance, budgeting, shared-expense settlement and AI-assisted fin
 - per-expense debts showing who owes the payer and how much
 - owner/admin monthly household budgets with optional category limits
 - Finance tab with monthly spend, budget status, category totals, recent expenses and personal debt visibility
-- Firestore tenant-isolation/security rules including backend-only finance writes
+- Groq-backed expense category suggestions through server-side strict structured output
+- Groq bill-text assistant that produces a reviewable draft before deterministic expense saving
+- Groq household spending insights from aggregate month/category/budget totals
+- server-side per-user AI quotas for category, bill and insight operations
+- Firebase Secret Manager declaration for the Groq API key
+- member-readable/backend-write-only AI insight records and backend-only AI quota state
+- Firestore tenant-isolation/security rules including backend-only finance and AI writes
 - emulator security-rule tests
 - Cloud Functions emulator integration coverage for ownership transfer and leave
 - Cloud Functions emulator integration coverage for household create/join/purchase, repeat-purchase rejection, and outsider denial
@@ -55,10 +61,9 @@ household-wide finance, budgeting, shared-expense settlement and AI-assisted fin
 ### Finance and AI
 
 - settlement/repayment recording so debts can be marked partially or fully paid
-- Groq-backed expense categorization and household spending insights
-- AI bill assistant for pasted receipt/bill text with user review before saving
-- optional receipt image OCR after the text-assisted flow is stable
-- AI response caching/rate controls and privacy/data-retention configuration
+- configure the real Groq API secret and perform a staging provider smoke test
+- choose/configure the production Groq data-retention policy (Zero Data Retention if required)
+- optional receipt image OCR only after the text-assisted bill flow is production-stable
 
 ### Hardening
 
@@ -66,7 +71,7 @@ household-wide finance, budgeting, shared-expense settlement and AI-assisted fin
 - add concurrency tests for two users purchasing/updating the same item
 - extend Firestore rule tests to every allowed/denied field mutation
 - enable Firebase App Check and set `enforceAppCheck: true` in production
-- add rate/abuse controls to invite, finance, AI and administrative callables
+- add rate/abuse controls to invite, finance and administrative callables (AI callables already have daily quotas)
 - decide and implement explicit household deletion semantics for a sole owner who wants to remove the household
 
 ### Resilience and UX

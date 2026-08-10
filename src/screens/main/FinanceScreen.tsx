@@ -5,13 +5,16 @@ import { AppButton } from '../../components/common/AppButton';
 import { AppCard } from '../../components/common/AppCard';
 import { LoadingView } from '../../components/common/LoadingView';
 import { Screen } from '../../components/common/Screen';
+import { AiBillAssistantModal } from '../../components/finance/AiBillAssistantModal';
 import { BudgetModal } from '../../components/finance/BudgetModal';
 import { ExpenseModal } from '../../components/finance/ExpenseModal';
 import { expenseCategoryLabel } from '../../constants/expenseCategories';
 import { useAuth } from '../../context/AuthContext';
 import { useHousehold } from '../../context/HouseholdContext';
+import { useHouseholdAiInsights } from '../../hooks/useHouseholdAiInsights';
 import { useHouseholdDetails } from '../../hooks/useHouseholdDetails';
 import { useHouseholdFinance } from '../../hooks/useHouseholdFinance';
+import * as aiService from '../../services/firebase/aiService';
 import * as financeService from '../../services/firebase/financeService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -35,8 +38,12 @@ export function FinanceScreen() {
   const { householdId } = useHousehold();
   const householdDetails = useHouseholdDetails(householdId, user?.uid);
   const finance = useHouseholdFinance(householdId);
+  const aiInsights = useHouseholdAiInsights(householdId, finance.period);
   const [expenseOpen, setExpenseOpen] = useState(false);
+  const [billAssistantOpen, setBillAssistantOpen] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
+  const [insightsBusy, setInsightsBusy] = useState(false);
+  const [insightsActionError, setInsightsActionError] = useState<string | null>(null);
 
   const memberNames = useMemo(
     () => new Map(householdDetails.members.map((member) => [member.userId, member.displayName || member.email])),
@@ -91,6 +98,18 @@ export function FinanceScreen() {
     }
   }
 
+  async function generateInsights() {
+    try {
+      setInsightsBusy(true);
+      setInsightsActionError(null);
+      await aiService.generateHouseholdAiInsights(activeHouseholdId);
+    } catch (error) {
+      setInsightsActionError(toUserMessage(error));
+    } finally {
+      setInsightsBusy(false);
+    }
+  }
+
   function personalDebtCopy(expense: HouseholdExpense): string | null {
     const debt = expense.debts.find(
       (value) => value.fromUserId === activeUser.uid && value.amountCents > (value.settledCents ?? 0),
@@ -118,7 +137,10 @@ export function FinanceScreen() {
           <Text style={styles.title}>Finance</Text>
           <Text style={styles.subtitle}>All household spending · {finance.period}</Text>
         </View>
-        <AppButton title="Add expense" onPress={() => setExpenseOpen(true)} style={styles.headerButton} />
+        <View style={styles.headerActions}>
+          <AppButton title="AI bill" variant="secondary" onPress={() => setBillAssistantOpen(true)} style={styles.headerButton} />
+          <AppButton title="Add expense" onPress={() => setExpenseOpen(true)} style={styles.headerButton} />
+        </View>
       </View>
 
       {finance.error || householdDetails.error ? (
@@ -152,6 +174,67 @@ export function FinanceScreen() {
             onPress={() => setBudgetOpen(true)}
           />
         ) : null}
+      </AppCard>
+
+      <Text style={styles.sectionTitle}>AI household insights</Text>
+      <AppCard style={styles.aiCard}>
+        <View style={styles.aiHeader}>
+          <View style={styles.aiHeaderCopy}>
+            <Text style={styles.aiTitle}>Groq spending analysis</Text>
+            <Text style={styles.aiMeta}>Uses aggregate category/month/budget totals, not individual member spending.</Text>
+          </View>
+          <AppButton
+            title={aiInsights.insights ? 'Refresh' : 'Generate'}
+            variant="secondary"
+            loading={insightsBusy}
+            onPress={() => void generateInsights()}
+            style={styles.aiAction}
+          />
+        </View>
+        {aiInsights.loading ? <Text style={styles.aiMeta}>Loading saved insights…</Text> : null}
+        {insightsActionError || aiInsights.error ? (
+          <Text style={styles.error}>{insightsActionError ?? aiInsights.error}</Text>
+        ) : null}
+        {aiInsights.insights ? (
+          <View style={styles.aiContent}>
+            <Text style={styles.aiSummary}>{aiInsights.insights.summary}</Text>
+            {aiInsights.insights.observations.length > 0 ? (
+              <View style={styles.aiSection}>
+                <Text style={styles.aiSectionTitle}>Observations</Text>
+                {aiInsights.insights.observations.map((item, index) => <Text key={`obs-${index}`} style={styles.aiBullet}>• {item}</Text>)}
+              </View>
+            ) : null}
+            {aiInsights.insights.overspendRisks.length > 0 ? (
+              <View style={styles.aiSection}>
+                <Text style={styles.aiSectionTitle}>Watch</Text>
+                {aiInsights.insights.overspendRisks.map((item, index) => <Text key={`risk-${index}`} style={styles.aiBullet}>• {item}</Text>)}
+              </View>
+            ) : null}
+            {aiInsights.insights.savingsOpportunities.length > 0 ? (
+              <View style={styles.aiSection}>
+                <Text style={styles.aiSectionTitle}>Savings opportunities</Text>
+                {aiInsights.insights.savingsOpportunities.map((item, index) => <Text key={`save-${index}`} style={styles.aiBullet}>• {item}</Text>)}
+              </View>
+            ) : null}
+            {aiInsights.insights.budgetSuggestions.length > 0 ? (
+              <View style={styles.aiSection}>
+                <Text style={styles.aiSectionTitle}>Suggested category budgets</Text>
+                {aiInsights.insights.budgetSuggestions.map((suggestion) => (
+                  <View key={suggestion.categoryId} style={styles.suggestionRow}>
+                    <View style={styles.suggestionCopy}>
+                      <Text style={styles.suggestionName}>{expenseCategoryLabel(suggestion.categoryId)}</Text>
+                      <Text style={styles.aiMeta}>{suggestion.reason}</Text>
+                    </View>
+                    <Text style={styles.suggestionAmount}>{formatMoney(suggestion.recommendedLimitCents)}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            <Text style={styles.aiDisclaimer}>AI analysis is advisory. Household totals and Go Dutch debts are calculated by deterministic code.</Text>
+          </View>
+        ) : (
+          <Text style={styles.emptyText}>Generate an analysis after recording household expenses to identify trends and possible budget pressure.</Text>
+        )}
       </AppCard>
 
       <Text style={styles.sectionTitle}>Spending by category</Text>
@@ -216,6 +299,14 @@ export function FinanceScreen() {
         onClose={() => setExpenseOpen(false)}
         onSubmit={createExpense}
       />
+      <AiBillAssistantModal
+        visible={billAssistantOpen}
+        householdId={activeHouseholdId}
+        currentUserId={activeUser.uid}
+        members={householdDetails.members}
+        onClose={() => setBillAssistantOpen(false)}
+        onSubmit={createExpense}
+      />
       <BudgetModal
         visible={budgetOpen}
         householdId={activeHouseholdId}
@@ -231,6 +322,7 @@ export function FinanceScreen() {
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md, marginBottom: spacing.lg },
   headerCopy: { flex: 1 },
+  headerActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: spacing.sm },
   title: { color: colors.text, fontSize: typography.title, fontWeight: '800' },
   subtitle: { color: colors.textMuted, marginTop: spacing.xs },
   headerButton: { minHeight: 44, paddingHorizontal: spacing.md },
@@ -246,6 +338,22 @@ const styles = StyleSheet.create({
   overBudget: { color: '#FF9C9C', fontWeight: '700' },
   sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '800', marginBottom: spacing.md },
   card: { marginBottom: spacing.xl },
+  aiCard: { marginBottom: spacing.xl, gap: spacing.md, borderColor: '#B7C7FF', backgroundColor: '#F7F9FF' },
+  aiHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
+  aiHeaderCopy: { flex: 1 },
+  aiTitle: { color: colors.text, fontSize: 17, fontWeight: '900' },
+  aiMeta: { color: colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: spacing.xs },
+  aiAction: { minHeight: 40, paddingHorizontal: spacing.md },
+  aiContent: { gap: spacing.md },
+  aiSummary: { color: colors.text, fontSize: 15, fontWeight: '700', lineHeight: 22 },
+  aiSection: { gap: spacing.xs },
+  aiSectionTitle: { color: colors.primary, fontSize: 12, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
+  aiBullet: { color: colors.text, fontSize: 13, lineHeight: 19 },
+  aiDisclaimer: { color: colors.textMuted, fontSize: 11, lineHeight: 17 },
+  suggestionRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingTop: spacing.sm },
+  suggestionCopy: { flex: 1 },
+  suggestionName: { color: colors.text, fontWeight: '800' },
+  suggestionAmount: { color: colors.primary, fontWeight: '900' },
   categoryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.sm },
   divider: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md, marginTop: spacing.xs },
   categoryCopy: { flex: 1 },

@@ -26,6 +26,12 @@ Updated: 10 August 2026
 - Per-expense debt records describing who owes the payer
 - Monthly household budget and per-category limits managed by owner/admin roles
 - Finance screen with monthly spend, budget remaining/overage, category totals, discounts and personal debt visibility
+- Server-side Groq client using a Firebase Secret Manager `GROQ_API_KEY`
+- Groq expense-category suggestions with strict category-schema output and user override
+- Groq bill-text assistant that returns a reviewable itemized draft instead of writing debts directly
+- Groq household spending insights generated from aggregate month/category/budget totals
+- Server-side per-user daily quotas for AI category, bill and insight requests
+- Member-readable/backend-write-only AI insight cache plus backend-only quota state
 - Per-device Expo notification registration plus backend household notification fan-out
 - Expo push-ticket persistence and scheduled push-receipt processing
 - Automatic disabling of device records when Expo reports `DeviceNotRegistered`, guarded against token rotation
@@ -35,7 +41,7 @@ Updated: 10 August 2026
 
 ## Verification completed in GitHub Actions
 
-The CI pipeline has successfully completed:
+The merged baseline CI pipeline has successfully completed:
 
 - mobile dependency installation
 - Cloud Functions dependency installation
@@ -56,6 +62,8 @@ Purchase date input has unit coverage for stable `YYYY-MM-DD` formatting/parsing
 
 Push receipt handling compiles as part of the Cloud Functions build, loads successfully in the Functions emulator suite, and has Firestore rule coverage proving signed-in clients cannot access the backend receipt queue.
 
+The Groq branch adds rule coverage for AI insight/quota isolation and is verified by pull-request CI before merge. CI deliberately does not make a live Groq provider call because no production/staging secret is exposed to GitHub Actions; a staging smoke test with a real secret remains a deployment step.
+
 ## External setup still required
 
 - Create/choose the Firebase dev, staging, and production projects and replace placeholder project IDs.
@@ -64,16 +72,16 @@ Push receipt handling compiles as part of the Cloud Functions build, loads succe
 - Ensure the Firebase production project can deploy the scheduled receipt processor through Cloud Scheduler.
 - Link the app to an Expo/EAS project (`eas init`) so an EAS project ID is written into app configuration.
 - Configure iOS/Android push credentials for production notifications.
-- Create/configure a Groq API key in Firebase Secret Manager before enabling AI functions.
+- Create/configure the Groq API key in Firebase Secret Manager and perform a staging AI smoke test.
+- Review/configure the Groq production data-retention policy, including Zero Data Retention if required.
 
 ## Remaining production work
 
-- Groq AI categorization, household spending insights and bill assistant
 - Expense repayment/settlement recording
 - Explicit delete-household flow for a sole owner who wants to remove the household entirely
 - App Check enablement and enforcement before production
 - Concurrency coverage for simultaneous purchase/inventory/finance updates
-- Rate and abuse controls for sensitive callables
+- Rate and abuse controls for non-AI sensitive callables
 - Broader Cloud Functions and Firestore rule branch coverage
 - Offline UX and retry/pending-state polish
 - Dark mode and accessibility/device QA
