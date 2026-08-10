@@ -1,0 +1,76 @@
+name: Firebase Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Firebase environment to deploy
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Require environment configuration
+        shell: bash
+        env:
+          WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          WIF_SERVICE_ACCOUNT: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+        run: |
+          test -n "$FIREBASE_PROJECT_ID" || { echo 'FIREBASE_PROJECT_ID environment variable is required.'; exit 1; }
+          test -n "$WIF_PROVIDER" || { echo 'GCP_WORKLOAD_IDENTITY_PROVIDER environment secret is required.'; exit 1; }
+          test -n "$WIF_SERVICE_ACCOUNT" || { echo 'GCP_DEPLOY_SERVICE_ACCOUNT environment secret is required.'; exit 1; }
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Install mobile dependencies
+        run: npm install
+
+      - name: Install Functions dependencies
+        run: npm --prefix functions install
+
+      - name: Verify exact deployment commit
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run functions:build
+          npm run test:functions
+          npm run test:rules
+
+      - name: Deploy Firestore and Functions
+        run: |
+          npx firebase-tools deploy \
+            --project "$FIREBASE_PROJECT_ID" \
+            --only firestore:rules,firestore:indexes,functions \
+            --non-interactive
