@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "HomeStock",
+    "slug": "household-inventory-app",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "homestock",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.aryankedare.householdinventory"
+    },
+    "android": {
+      "package": "com.aryankedare.householdinventory",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B1220"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "environment": "development"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow HomeStock to scan household product barcodes."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#2457F5",
+          "defaultChannel": "household-updates"
+        }
+      ]
+    ]
+  }
+}
