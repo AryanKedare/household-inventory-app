@@ -1,0 +1,46 @@
+name: EAS Submit Latest Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Store platform
+        required: true
+        type: choice
+        options:
+          - ios
+          - android
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Require Expo token
+        shell: bash
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo 'EXPO_TOKEN repository secret is required.'
+            exit 1
+          fi
+
+      - name: Submit latest EAS production build
+        shell: bash
+        run: |
+          npx eas-cli@latest submit \
+            --platform '${{ inputs.platform }}' \
+            --latest \
+            --non-interactive
