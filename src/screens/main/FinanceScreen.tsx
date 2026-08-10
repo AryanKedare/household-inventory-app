@@ -7,6 +7,7 @@ import { LoadingView } from '../../components/common/LoadingView';
 import { Screen } from '../../components/common/Screen';
 import { AiBillAssistantModal } from '../../components/finance/AiBillAssistantModal';
 import { BudgetModal } from '../../components/finance/BudgetModal';
+import { DebtSettlementSection } from '../../components/finance/DebtSettlementSection';
 import { ExpenseModal } from '../../components/finance/ExpenseModal';
 import { expenseCategoryLabel } from '../../constants/expenseCategories';
 import { useAuth } from '../../context/AuthContext';
@@ -258,6 +259,13 @@ export function FinanceScreen() {
         )}
       </AppCard>
 
+      <DebtSettlementSection
+        householdId={activeHouseholdId}
+        currentUserId={activeUser.uid}
+        members={householdDetails.members}
+        expenses={finance.expenses}
+      />
+
       <Text style={styles.sectionTitle}>Recent expenses</Text>
       {finance.expenses.length === 0 ? (
         <AppCard style={styles.card}>
@@ -286,6 +294,7 @@ export function FinanceScreen() {
                 <Text style={styles.discount}>Bill discount applied: −{formatMoney(expense.discountCents)}</Text>
               ) : null}
               {debtCopy ? <Text style={styles.debt}>{debtCopy}</Text> : null}
+              {expense.settlementStatus === 'settled' ? <Text style={styles.settled}>Settled</Text> : null}
             </AppCard>
           );
         })
@@ -368,6 +377,7 @@ const styles = StyleSheet.create({
   expenseAmount: { color: colors.text, fontSize: 17, fontWeight: '900' },
   discount: { color: colors.success, fontSize: 12, fontWeight: '700' },
   debt: { color: colors.primary, fontSize: 13, fontWeight: '800' },
+  settled: { color: colors.success, fontSize: 12, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.8 },
   emptyTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
   emptyText: { color: colors.textMuted, lineHeight: 20 },
 });
