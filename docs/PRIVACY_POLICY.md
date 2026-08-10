@@ -81,7 +81,11 @@ HomeStock applies server-side usage limits to AI requests to reduce abuse and un
 
 ## 7. Data retention
 
-Household records remain available while the household and relevant records exist, subject to product deletion and operational retention rules. A sole owner can permanently delete the household through Settings. The deletion flow removes the household document and its nested household data, including inventory, shopping records, purchases, household expenses, budgets, settlements, activity records, and saved AI insights.
+Household records remain available while the household and relevant records exist, subject to product deletion and operational retention rules. A sole owner can permanently delete the household through Settings. The household-deletion flow removes the household document and its nested household data, including inventory, shopping records, purchases, household expenses, budgets, settlements, activity records, and saved AI insights.
+
+HomeStock also provides in-app account deletion. Account deletion removes the Firebase Authentication account, the user's profile and notification-device records, AI quota state, and non-owner household memberships. A user who still owns a household must transfer ownership or delete that household before deleting the account.
+
+Some shared household records may remain after an individual account is deleted when they are part of the remaining household's shared accounting or audit history, for example an expense or settlement involving other household members. This preserves the integrity of balances and historical records relied on by the remaining household members.
 
 Some service providers may retain limited operational or security logs according to their own policies and configured retention settings. Production deployment must document the selected provider retention configuration.
 
@@ -95,7 +99,7 @@ No internet service can guarantee absolute security. Users should protect their 
 
 Depending on your location, applicable law may provide rights concerning access, correction, deletion, restriction, objection, portability, or complaints to a data-protection authority.
 
-Within HomeStock you can disable push notifications, leave a household when permitted, and—when you are the sole owner—permanently delete the household. For account/data requests that cannot be completed in-app, contact `[CONTACT_EMAIL]`.
+Within HomeStock you can disable push notifications, leave a household when permitted, permanently delete your account from Settings subject to the household-ownership guard, and—when you are the sole owner—permanently delete the household. For account/data requests that cannot be completed in-app, contact `[CONTACT_EMAIL]`.
 
 ## 10. Children's privacy
 
