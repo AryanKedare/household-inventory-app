@@ -21,3 +21,4 @@ export {
   suggestExpenseCategory,
 } from './householdAi';
 export { householdActivityNotification, processExpoPushReceipts } from './pushNotifications';
+export { deleteAccount } from './accountDeletion';
