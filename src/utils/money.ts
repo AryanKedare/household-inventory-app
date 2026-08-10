@@ -1,3 +1,7 @@
+export function parseDecimalInput(value: string): number {
+  return Number(value.trim().replace(',', '.'));
+}
+
 export function eurosToCents(value: number): number {
   return Math.round(value * 100);
 }
