@@ -24,6 +24,9 @@ Updated: 10 August 2026
 - Trusted shared-expense creation with per-person or itemized splits
 - Deterministic proportional discount and fee allocation with exact cent reconciliation
 - Per-expense debt records describing who owes the payer
+- Partial and full Go Dutch repayments recorded transactionally by debtor or payee
+- Immutable household settlement records and expense-level `partial`/`settled` state
+- Finance balance view showing what the current user owes or is owed
 - Monthly household budget and per-category limits managed by owner/admin roles
 - Finance screen with monthly spend, budget remaining/overage, category totals, discounts and personal debt visibility
 - Server-side Groq client using a Firebase Secret Manager `GROQ_API_KEY`
@@ -58,11 +61,13 @@ The core callable integration suite verifies invalid invite rejection, household
 
 The finance test suites verify direct and itemized shared expenses, exact proportional discount allocation, fee allocation, cent rounding, large-value integer arithmetic, outsider participant rejection, owner/admin budget permissions, and Firestore tenant/write isolation. The supplied five-person restaurant example (€15, €10, €21, €53, €67 with a €20 discount) reconciles exactly to €146 after discount.
 
+The settlement suite verifies partial repayment by the debtor, final repayment by the payee, exact outstanding balances, overpayment rejection, already-settled rejection, outsider denial, immutable settlement audit records and settlement Security Rules.
+
 Purchase date input has unit coverage for stable `YYYY-MM-DD` formatting/parsing and rejects malformed or impossible calendar dates before the request reaches the backend.
 
 Push receipt handling compiles as part of the Cloud Functions build, loads successfully in the Functions emulator suite, and has Firestore rule coverage proving signed-in clients cannot access the backend receipt queue.
 
-The Groq branch adds rule coverage for AI insight/quota isolation and is verified by pull-request CI before merge. CI deliberately does not make a live Groq provider call because no production/staging secret is exposed to GitHub Actions; a staging smoke test with a real secret remains a deployment step.
+The Groq integration compiles and loads in CI with Secret Manager declarations. CI deliberately does not make a live Groq provider call because no production/staging secret is exposed to GitHub Actions; a staging smoke test with a real secret remains a deployment step.
 
 ## External setup still required
 
@@ -77,7 +82,6 @@ The Groq branch adds rule coverage for AI insight/quota isolation and is verifie
 
 ## Remaining production work
 
-- Expense repayment/settlement recording
 - Explicit delete-household flow for a sole owner who wants to remove the household entirely
 - App Check enablement and enforcement before production
 - Concurrency coverage for simultaneous purchase/inventory/finance updates
