@@ -20,6 +20,12 @@ Updated: 10 August 2026
 - Dashboard inventory/shopping/monthly-spend/store/price-change insights
 - Item purchase and price history
 - Household activity feed
+- Household-wide finance categories for groceries, dining out, housing, utilities, transport, electronics and other shared spending
+- Trusted shared-expense creation with per-person or itemized splits
+- Deterministic proportional discount and fee allocation with exact cent reconciliation
+- Per-expense debt records describing who owes the payer
+- Monthly household budget and per-category limits managed by owner/admin roles
+- Finance screen with monthly spend, budget remaining/overage, category totals, discounts and personal debt visibility
 - Per-device Expo notification registration plus backend household notification fan-out
 - Expo push-ticket persistence and scheduled push-receipt processing
 - Automatic disabling of device records when Expo reports `DeviceNotRegistered`, guarded against token rotation
@@ -44,6 +50,8 @@ The lifecycle integration suite verifies that an owner cannot leave an ownerless
 
 The core callable integration suite verifies invalid invite rejection, household creation, invite joining, repeat joining, owner/member/default-household records, transactional purchase, inventory replenishment, purchase and price history, repeat-purchase rejection, and non-member purchase denial.
 
+The finance test suites verify direct and itemized shared expenses, exact proportional discount allocation, fee allocation, cent rounding, large-value integer arithmetic, outsider participant rejection, owner/admin budget permissions, and Firestore tenant/write isolation. The supplied five-person restaurant example (€15, €10, €21, €53, €67 with a €20 discount) reconciles exactly to €146 after discount.
+
 Purchase date input has unit coverage for stable `YYYY-MM-DD` formatting/parsing and rejects malformed or impossible calendar dates before the request reaches the backend.
 
 Push receipt handling compiles as part of the Cloud Functions build, loads successfully in the Functions emulator suite, and has Firestore rule coverage proving signed-in clients cannot access the backend receipt queue.
@@ -56,12 +64,17 @@ Push receipt handling compiles as part of the Cloud Functions build, loads succe
 - Ensure the Firebase production project can deploy the scheduled receipt processor through Cloud Scheduler.
 - Link the app to an Expo/EAS project (`eas init`) so an EAS project ID is written into app configuration.
 - Configure iOS/Android push credentials for production notifications.
+- Create/configure a Groq API key in Firebase Secret Manager before enabling AI functions.
 
-## Remaining MVP/product hardening
+## Remaining production work
 
+- Groq AI categorization, household spending insights and bill assistant
+- Expense repayment/settlement recording
 - Explicit delete-household flow for a sole owner who wants to remove the household entirely
 - App Check enablement and enforcement before production
-- Concurrency coverage for simultaneous purchase/inventory updates
+- Concurrency coverage for simultaneous purchase/inventory/finance updates
+- Rate and abuse controls for sensitive callables
 - Broader Cloud Functions and Firestore rule branch coverage
 - Offline UX and retry/pending-state polish
-- Accessibility/device QA, store assets, privacy policy/data-safety disclosures, TestFlight/Play closed testing
+- Dark mode and accessibility/device QA
+- Store assets, privacy policy/data-safety disclosures, TestFlight/Play closed testing and production submission
