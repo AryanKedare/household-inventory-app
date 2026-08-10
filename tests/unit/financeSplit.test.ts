@@ -94,3 +94,38 @@ test('discount cannot exceed the pre-discount subtotal', () => {
     /Discount cannot exceed/,
   );
 });
+
+test('large proportional allocations remain exact without floating-point precision loss', () => {
+  const result = calculateExpenseSplit({
+    paidBy: 'a',
+    participantSubtotals: [
+      { userId: 'a', subtotalCents: 49_999_999 },
+      { userId: 'b', subtotalCents: 49_999_998 },
+    ],
+    discountCents: 33_333_333,
+  });
+
+  assert.equal(result.subtotalCents, 99_999_997);
+  assert.equal(
+    result.allocations.reduce((sum, allocation) => sum + allocation.discountShareCents, 0),
+    33_333_333,
+  );
+  assert.equal(
+    result.allocations.reduce((sum, allocation) => sum + allocation.owedCents, 0),
+    result.totalPaidCents,
+  );
+});
+
+test('expense subtotal cannot exceed the supported maximum', () => {
+  assert.throws(
+    () =>
+      calculateExpenseSplit({
+        paidBy: 'a',
+        participantSubtotals: [
+          { userId: 'a', subtotalCents: 60_000_000 },
+          { userId: 'b', subtotalCents: 50_000_000 },
+        ],
+      }),
+    /exceeds the supported maximum/,
+  );
+});
