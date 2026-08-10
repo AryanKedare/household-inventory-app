@@ -123,7 +123,9 @@ export type ActivityType =
   | 'shopping_item_removed'
   | 'item_purchased'
   | 'member_joined'
-  | 'member_removed';
+  | 'member_removed'
+  | 'member_left'
+  | 'ownership_transferred';
 
 export interface Activity {
   id: string;
