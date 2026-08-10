@@ -57,6 +57,8 @@ export function FinanceScreen() {
     return null;
   }
 
+  const activeHouseholdId = householdId;
+  const activeUser = user;
   const canEditBudget =
     householdDetails.currentRole === 'owner' || householdDetails.currentRole === 'admin';
   const budgetLimit = finance.budget?.totalLimitCents ?? 0;
@@ -66,9 +68,9 @@ export function FinanceScreen() {
   async function createExpense(input: financeService.CreateHouseholdExpenseInput) {
     try {
       const result = await financeService.createHouseholdExpense(input);
-      const currentUserDebt = result.debts.find((debt) => debt.fromUserId === user.uid);
+      const currentUserDebt = result.debts.find((debt) => debt.fromUserId === activeUser.uid);
       const owedToCurrentUser = result.debts
-        .filter((debt) => debt.toUserId === user.uid)
+        .filter((debt) => debt.toUserId === activeUser.uid)
         .reduce((sum, debt) => sum + debt.amountCents, 0);
       if (currentUserDebt) {
         Alert.alert('Expense saved', `Your share is ${formatMoney(currentUserDebt.amountCents)} owed to ${memberNames.get(currentUserDebt.toUserId) ?? 'the payer'}.`);
@@ -91,13 +93,13 @@ export function FinanceScreen() {
 
   function personalDebtCopy(expense: HouseholdExpense): string | null {
     const debt = expense.debts.find(
-      (value) => value.fromUserId === user.uid && value.amountCents > (value.settledCents ?? 0),
+      (value) => value.fromUserId === activeUser.uid && value.amountCents > (value.settledCents ?? 0),
     );
     if (debt) {
       const outstanding = debt.amountCents - (debt.settledCents ?? 0);
       return `You owe ${formatMoney(outstanding)} to ${memberNames.get(debt.toUserId) ?? 'the payer'}`;
     }
-    if (expense.paidBy === user.uid) {
+    if (expense.paidBy === activeUser.uid) {
       const outstanding = expense.debts.reduce(
         (sum, value) => sum + Math.max(0, value.amountCents - (value.settledCents ?? 0)),
         0,
@@ -129,7 +131,7 @@ export function FinanceScreen() {
         {budgetLimit > 0 ? (
           <>
             <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${budgetPercent}%` }]} />
+              <View style={[styles.progressFill, { width: `${budgetPercent}%` as `${number}%` }]} />
             </View>
             <View style={styles.heroFooter}>
               <Text style={styles.heroMeta}>Budget {formatMoney(budgetLimit)}</Text>
@@ -208,15 +210,15 @@ export function FinanceScreen() {
 
       <ExpenseModal
         visible={expenseOpen}
-        householdId={householdId}
-        currentUserId={user.uid}
+        householdId={activeHouseholdId}
+        currentUserId={activeUser.uid}
         members={householdDetails.members}
         onClose={() => setExpenseOpen(false)}
         onSubmit={createExpense}
       />
       <BudgetModal
         visible={budgetOpen}
-        householdId={householdId}
+        householdId={activeHouseholdId}
         period={finance.period}
         budget={finance.budget}
         onClose={() => setBudgetOpen(false)}
