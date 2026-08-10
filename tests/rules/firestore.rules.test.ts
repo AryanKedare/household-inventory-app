@@ -207,3 +207,28 @@ test('client cannot create purchase history directly', async () => {
     }),
   );
 });
+
+test('push receipt queue is inaccessible to signed-in clients', async () => {
+  await testEnv.clearFirestore();
+  await seedHousehold();
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'pushReceipts', 'receipt-1'), {
+      expoPushToken: 'ExpoPushToken[test]',
+      devicePaths: ['users/member-a/devices/test'],
+      sentAt: Timestamp.fromMillis(1),
+    });
+  });
+
+  const db = testEnv.authenticatedContext('member-a').firestore();
+  const receiptRef = doc(db, 'pushReceipts', 'receipt-1');
+
+  await assertFails(getDoc(receiptRef));
+  await assertFails(
+    setDoc(doc(db, 'pushReceipts', 'receipt-2'), {
+      expoPushToken: 'ExpoPushToken[forged]',
+      devicePaths: ['users/member-a/devices/forged'],
+      sentAt: Timestamp.fromMillis(2),
+    }),
+  );
+});
