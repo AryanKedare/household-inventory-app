@@ -12,7 +12,7 @@ import {
   getAuth,
   type User,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable, type Functions } from 'firebase/functions';
 
 const PROJECT_ID = 'demo-homestock';
@@ -150,4 +150,77 @@ test('owner cannot delete household while another member remains', async () => {
     () => deleteHousehold({ householdId: 'delete-home' }),
     (error: unknown) => callableErrorCode(error) === 'functions/failed-precondition',
   );
+});
+
+test('deletion starter can safely retry after child documents were partially removed', async () => {
+  await testEnv.clearFirestore();
+  const owner = await createAuthedUser('delete-retry-owner', 'delete-retry-owner@example.test');
+  await seedHousehold(owner.user);
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(
+      doc(db, 'households', 'delete-home'),
+      {
+        deleting: true,
+        deletionStartedBy: owner.user.uid,
+        deletionStartedAt: Timestamp.fromMillis(2),
+        updatedAt: Timestamp.fromMillis(2),
+      },
+      { merge: true },
+    );
+    await deleteDoc(doc(db, 'households', 'delete-home', 'members', owner.user.uid));
+    await deleteDoc(doc(db, 'inviteCodes', 'DEL234'));
+  });
+
+  const deleteHousehold = httpsCallable<
+    { householdId: string },
+    { success: boolean; alreadyDeleted: boolean }
+  >(owner.functions, 'deleteHousehold');
+  const result = await deleteHousehold({ householdId: 'delete-home' });
+  assert.equal(result.data.success, true);
+  assert.equal(result.data.alreadyDeleted, false);
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    assert.equal((await getDoc(doc(db, 'households', 'delete-home'))).exists(), false);
+    const ownerProfile = await getDoc(doc(db, 'users', owner.user.uid));
+    assert.equal(ownerProfile.data()?.defaultHouseholdId, undefined);
+  });
+});
+
+test('another user cannot take over an interrupted household deletion', async () => {
+  await testEnv.clearFirestore();
+  const owner = await createAuthedUser('delete-lock-owner', 'delete-lock-owner@example.test');
+  const attacker = await createAuthedUser('delete-lock-attacker', 'delete-lock-attacker@example.test');
+  await seedHousehold(owner.user);
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(
+      doc(db, 'households', 'delete-home'),
+      {
+        deleting: true,
+        deletionStartedBy: owner.user.uid,
+        deletionStartedAt: Timestamp.fromMillis(2),
+        updatedAt: Timestamp.fromMillis(2),
+      },
+      { merge: true },
+    );
+    await deleteDoc(doc(db, 'households', 'delete-home', 'members', owner.user.uid));
+  });
+
+  const deleteHousehold = httpsCallable<{ householdId: string }, unknown>(
+    attacker.functions,
+    'deleteHousehold',
+  );
+  await assert.rejects(
+    () => deleteHousehold({ householdId: 'delete-home' }),
+    (error: unknown) => callableErrorCode(error) === 'functions/permission-denied',
+  );
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    assert.equal((await getDoc(doc(db, 'households', 'delete-home'))).exists(), true);
+  });
 });
