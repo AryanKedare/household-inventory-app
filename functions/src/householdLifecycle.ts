@@ -162,3 +162,5 @@ export const leaveHousehold = onCall<HouseholdLifecycleRequest>(
     return { success: true };
   },
 );
+
+export { deleteHousehold } from './householdDeletion';
