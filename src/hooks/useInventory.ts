@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import type { InventoryItem, ItemStatus } from '../types/domain';
-import { subscribeToInventory } from '../services/firebase/inventoryService';
+import { subscribeToInventory } from '../services/supabase/inventoryService';
 
 export function useInventory(householdId: string | null) {
   const [items, setItems] = useState<InventoryItem[]>([]);
