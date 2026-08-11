@@ -6,6 +6,7 @@ const db = getFirestore();
 const REGION = 'europe-west1';
 const EXPO_PUSH_SEND_URL = 'https://exp.host/--/api/v2/push/send';
 const EXPO_PUSH_RECEIPTS_URL = 'https://exp.host/--/api/v2/push/getReceipts';
+const EXPO_REQUEST_TIMEOUT_MS = 15_000;
 const RECEIPT_CHECK_DELAY_MS = 15 * 60 * 1000;
 const RECEIPT_EXPIRY_MS = 24 * 60 * 60 * 1000;
 const RECEIPT_BATCH_LIMIT = 500;
@@ -54,6 +55,8 @@ interface ExpoPushReceiptResponse {
 function isExpoPushToken(value: unknown): value is string {
   return (
     typeof value === 'string' &&
+    value.length <= 256 &&
+    value.endsWith(']') &&
     (value.startsWith('ExpoPushToken[') || value.startsWith('ExponentPushToken['))
   );
 }
@@ -193,6 +196,7 @@ async function sendExpoPushTargets(
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
+      signal: AbortSignal.timeout(EXPO_REQUEST_TIMEOUT_MS),
       body: JSON.stringify(messages),
     });
 
@@ -202,7 +206,14 @@ async function sendExpoPushTargets(
       continue;
     }
 
-    const payload = (await response.json()) as ExpoPushSendResponse;
+    let payload: ExpoPushSendResponse;
+    try {
+      payload = (await response.json()) as ExpoPushSendResponse;
+    } catch {
+      console.error('Expo push request returned unreadable JSON');
+      continue;
+    }
+
     const tickets = normalizeTickets(payload.data);
     if (tickets.length !== chunk.length) {
       console.error('Expo push ticket count did not match the message count', {
@@ -312,10 +323,14 @@ export const processExpoPushReceipts = onSchedule(
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
+        signal: AbortSignal.timeout(EXPO_REQUEST_TIMEOUT_MS),
         body: JSON.stringify({ ids: pending.docs.map((document) => document.id) }),
       });
     } catch (error) {
-      console.error('Unable to request Expo push receipts', error);
+      console.error(
+        'Unable to request Expo push receipts',
+        error instanceof Error ? error.name : 'Unknown network error',
+      );
       return;
     }
 
@@ -325,7 +340,14 @@ export const processExpoPushReceipts = onSchedule(
       return;
     }
 
-    const payload = (await response.json()) as ExpoPushReceiptResponse;
+    let payload: ExpoPushReceiptResponse;
+    try {
+      payload = (await response.json()) as ExpoPushReceiptResponse;
+    } catch {
+      console.error('Expo push receipt request returned unreadable JSON');
+      return;
+    }
+
     const receipts = payload.data ?? {};
     const batch = db.batch();
     let writeCount = 0;

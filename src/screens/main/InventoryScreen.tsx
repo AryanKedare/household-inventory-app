@@ -138,7 +138,7 @@ export function InventoryScreen() {
   async function changeQuantity(item: InventoryItem, nextQuantity: number) {
     try {
       setBusyItemId(item.id);
-      await inventoryService.setQuantity(activeHouseholdId, activeUser.uid, item, nextQuantity);
+      await inventoryService.setQuantity(activeHouseholdId, item, nextQuantity);
     } catch (quantityError) {
       Alert.alert('Could not update quantity', toUserMessage(quantityError));
     } finally {

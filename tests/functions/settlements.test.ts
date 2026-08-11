@@ -192,3 +192,50 @@ test('outsider cannot record a repayment and overpayment is rejected', async () 
     (error: unknown) => callableErrorCode(error) === 'functions/invalid-argument',
   );
 });
+
+test('corrupted settled amount is rejected instead of reopening the debt', async () => {
+  await testEnv.clearFirestore();
+  const owner = await createAuthedUser('settlement-owner-corrupt', 'settlement-owner-corrupt@example.test');
+  const member = await createAuthedUser('settlement-member-corrupt', 'settlement-member-corrupt@example.test');
+  await seedExpense(owner.user, member.user);
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    const expenseRef = doc(db, 'households', 'settlement-home', 'expenses', 'dinner');
+    const snapshot = await getDoc(expenseRef);
+    await setDoc(
+      expenseRef,
+      {
+        debts: [
+          {
+            ...snapshot.data()?.debts?.[0],
+            settledCents: 1500,
+          },
+        ],
+      },
+      { merge: true },
+    );
+  });
+
+  const memberSettle = httpsCallable<Record<string, unknown>, unknown>(
+    member.functions,
+    'recordExpenseSettlement',
+  );
+  await assert.rejects(
+    () => memberSettle({
+      householdId: 'settlement-home',
+      expenseId: 'dinner',
+      fromUserId: member.user.uid,
+      amountCents: 100,
+    }),
+    (error: unknown) => callableErrorCode(error) === 'functions/data-loss',
+  );
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    const settlements = await getDocs(collection(db, 'households', 'settlement-home', 'settlements'));
+    const expense = await getDoc(doc(db, 'households', 'settlement-home', 'expenses', 'dinner'));
+    assert.equal(settlements.size, 0);
+    assert.equal(expense.data()?.debts?.[0]?.settledCents, 1500);
+  });
+});

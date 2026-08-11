@@ -19,25 +19,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
         with:
           languages: javascript-typescript
 
       - name: Analyze
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
 
   dependency-audit:
     name: npm audit
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
 
@@ -49,9 +53,9 @@ jobs:
 
       # High-severity findings remain visible in every run, but do not permanently
       # block all development when an upstream package has no patched release.
-      # As of 2026-08-10, Expo/Metro pulls image-size and GitHub reports high-severity
-      # image-size DoS advisories with no patched version available. These are build-
-      # tooling transitive dependencies rather than HomeStock runtime image parsing.
+      # Expo/Metro currently pulls image-size versions affected by high-severity
+      # parser DoS advisories; npm's proposed forced remediation breaks the supported
+      # Expo/React Native stack. Keep this exception under review rather than hiding it.
       - name: Report high+ mobile dependency findings
         continue-on-error: true
         run: npm audit --omit=dev --audit-level=high

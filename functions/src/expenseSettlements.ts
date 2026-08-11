@@ -72,21 +72,22 @@ function parseDebts(value: unknown): ExpenseDebtRecord[] {
       typeof data.fromUserId !== 'string' ||
       typeof data.toUserId !== 'string' ||
       !Number.isSafeInteger(data.amountCents) ||
-      (data.amountCents as number) < 0
+      (data.amountCents as number) <= 0 ||
+      (data.amountCents as number) > MAX_MONEY_CENTS ||
+      !Number.isSafeInteger(data.settledCents) ||
+      (data.settledCents as number) < 0 ||
+      (data.settledCents as number) > (data.amountCents as number)
     ) {
+      // Never repair corrupted accounting state implicitly. Resetting an invalid
+      // settled amount to zero could reopen an already-paid debt and allow a
+      // duplicate repayment to be recorded.
       throw new HttpsError('data-loss', 'Expense debt data is invalid.');
     }
-    const settledCents =
-      Number.isSafeInteger(data.settledCents) &&
-      (data.settledCents as number) >= 0 &&
-      (data.settledCents as number) <= (data.amountCents as number)
-        ? (data.settledCents as number)
-        : 0;
     return {
       fromUserId: data.fromUserId,
       toUserId: data.toUserId,
       amountCents: data.amountCents as number,
-      settledCents,
+      settledCents: data.settledCents as number,
     };
   });
 }

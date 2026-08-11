@@ -17,6 +17,7 @@ import {
 import type { InventoryItem } from '../../types/domain';
 import { getItemStatus } from '../../utils/inventoryStatus';
 import { getFirebaseServices } from './client';
+import { adjustInventoryQuantity } from './inventoryQuantityService';
 
 export interface InventoryItemInput {
   name: string;
@@ -29,12 +30,16 @@ export interface InventoryItemInput {
   barcode?: string;
 }
 
-function requireDb() {
+function requireServices() {
   const services = getFirebaseServices();
   if (!services) {
     throw new Error('Firebase is not configured.');
   }
-  return services.db;
+  return services;
+}
+
+function requireDb() {
+  return requireServices().db;
 }
 
 function itemCollection(householdId: string) {
@@ -61,7 +66,6 @@ export function subscribeToInventory(
     (error) => onError(error),
   );
 }
-
 
 export async function findInventoryItemByBarcode(
   householdId: string,
@@ -144,19 +148,16 @@ export async function updateItem(
 
 export async function setQuantity(
   householdId: string,
-  uid: string,
   item: InventoryItem,
   quantity: number,
 ): Promise<void> {
-  const db = requireDb();
   const nextQuantity = Math.max(0, quantity);
+  const delta = nextQuantity - item.quantity;
+  if (delta === 0) {
+    return;
+  }
 
-  await updateDoc(doc(db, 'households', householdId, 'items', item.id), {
-    quantity: nextQuantity,
-    status: getItemStatus(nextQuantity, item.lowStockThreshold),
-    updatedBy: uid,
-    updatedAt: serverTimestamp(),
-  });
+  await adjustInventoryQuantity(householdId, item.id, delta);
 }
 
 export async function deleteItem(householdId: string, itemId: string): Promise<void> {
