@@ -1,8 +1,0 @@
-{
-  "projects": {
-    "default": "household-app-dev",
-    "dev": "household-app-dev",
-    "staging": "household-app-staging",
-    "prod": "household-app-prod"
-  }
-}
