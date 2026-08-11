@@ -32,8 +32,12 @@ jobs:
           ready=false
           health_status="000"
           create_expense_status="000"
+          category_status="000"
+          bill_status="000"
+          insights_status="000"
+          smoke_household="00000000-0000-4000-8000-000000000000"
 
-          for attempt in $(seq 1 40); do
+          for attempt in $(seq 1 50); do
             if ! kill -0 "$edge_pid" 2>/dev/null; then
               echo "Supabase Edge Function server exited before becoming ready."
               cat /tmp/homestock-edge.log
@@ -53,10 +57,40 @@ jobs:
               --data '{}' \
               http://127.0.0.1:54321/functions/v1/create-expense || true)"
 
+            category_status="$(curl --silent --show-error \
+              --output /tmp/category.json \
+              --write-out '%{http_code}' \
+              --request POST \
+              --header 'content-type: application/json' \
+              --data "{\"householdId\":\"${smoke_household}\",\"title\":\"Smoke test\"}" \
+              http://127.0.0.1:54321/functions/v1/suggest-expense-category || true)"
+
+            bill_status="$(curl --silent --show-error \
+              --output /tmp/bill.json \
+              --write-out '%{http_code}' \
+              --request POST \
+              --header 'content-type: application/json' \
+              --data "{\"householdId\":\"${smoke_household}\",\"billText\":\"Smoke test\"}" \
+              http://127.0.0.1:54321/functions/v1/analyze-household-bill || true)"
+
+            insights_status="$(curl --silent --show-error \
+              --output /tmp/insights.json \
+              --write-out '%{http_code}' \
+              --request POST \
+              --header 'content-type: application/json' \
+              --data "{\"householdId\":\"${smoke_household}\"}" \
+              http://127.0.0.1:54321/functions/v1/generate-household-insights || true)"
+
             if [ "$health_status" = "200" ] && \
                grep -q '"ok":true' /tmp/health.json && \
                [ "$create_expense_status" = "400" ] && \
-               grep -q '"error":"Missing Authorization header"' /tmp/create-expense.json; then
+               grep -q '"error":"Missing Authorization header"' /tmp/create-expense.json && \
+               [ "$category_status" = "400" ] && \
+               grep -q '"error":"Missing Authorization header"' /tmp/category.json && \
+               [ "$bill_status" = "400" ] && \
+               grep -q '"error":"Missing Authorization header"' /tmp/bill.json && \
+               [ "$insights_status" = "400" ] && \
+               grep -q '"error":"Missing Authorization header"' /tmp/insights.json; then
               ready=true
               break
             fi
@@ -65,13 +99,19 @@ jobs:
           done
 
           if [ "$ready" != true ]; then
-            echo "Edge Function smoke test did not reach the function handlers."
-            echo "health HTTP status: ${health_status}"
-            cat /tmp/health.json 2>/dev/null || true
-            echo
-            echo "create-expense HTTP status: ${create_expense_status}"
-            cat /tmp/create-expense.json 2>/dev/null || true
-            echo
+            echo "Edge Function smoke test did not reach every function auth boundary."
+            for probe in health create-expense category bill insights; do
+              echo "--- ${probe} ---"
+              case "$probe" in
+                health) echo "HTTP ${health_status}" ;;
+                create-expense) echo "HTTP ${create_expense_status}" ;;
+                category) echo "HTTP ${category_status}" ;;
+                bill) echo "HTTP ${bill_status}" ;;
+                insights) echo "HTTP ${insights_status}" ;;
+              esac
+              cat "/tmp/${probe}.json" 2>/dev/null || true
+              echo
+            done
             echo "--- Edge Function runtime log ---"
             cat /tmp/homestock-edge.log
             exit 1
