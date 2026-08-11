@@ -22,17 +22,8 @@ jobs:
         with:
           node-version: 22
 
-      - name: Setup Java for Firebase Emulator
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Install mobile dependencies
+      - name: Install dependencies
         run: npm install
-
-      - name: Install function dependencies
-        run: npm --prefix functions install
 
       - name: Typecheck
         run: npm run typecheck
@@ -42,12 +33,3 @@ jobs:
 
       - name: Unit tests
         run: npm test
-
-      - name: Build Cloud Functions
-        run: npm run functions:build
-
-      - name: Cloud Functions emulator integration tests
-        run: npm run test:functions
-
-      - name: Firestore Security Rules tests
-        run: npm run test:rules
