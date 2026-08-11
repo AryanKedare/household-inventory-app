@@ -27,6 +27,18 @@ Remediation:
 - invalid stored debt state now returns `data-loss` and writes no new settlement;
 - emulator coverage verifies corrupted state remains untouched and no repayment record is created.
 
+### Inventory quantity concurrency path
+
+The transactional `adjustInventoryQuantity` callable and concurrency tests already existed, but the real inventory +/- UI still called a direct Firestore `updateDoc` path. Two devices could therefore overwrite one another even while the dedicated server concurrency test passed.
+
+Remediation:
+
+- inventory quantity buttons now calculate a delta and call the existing `inventoryQuantityService` wrapper;
+- the service invokes `adjustInventoryQuantity`, which performs the read/modify/write inside a server-side Firestore transaction;
+- the existing simultaneous-increment emulator regression now protects the same callable used by the real +/- UI path.
+
+The full item editor still intentionally saves an absolute form snapshot, including quantity. That is explicit last-write-wins edit behavior and should be reconsidered if collaborative simultaneous metadata/quantity editing becomes a product requirement.
+
 ### External-provider request bounds
 
 Groq and Expo requests previously depended only on the enclosing Cloud Function runtime timeout.
@@ -48,6 +60,9 @@ Remediation:
 - setup-java moved to v5;
 - CodeQL moved to v4;
 - Google Cloud authentication moved to `google-github-actions/auth@v3`;
+- all external workflow actions are referenced by full commit SHA with the intended major version kept as a comment, preventing a future movable tag update from changing executable workflow code unexpectedly;
+- checkout does not persist repository credentials after the checkout step;
+- privileged EAS/Firebase workflows explicitly disable setup-node package-manager caching until deterministic lockfiles exist and cache trust is reviewed;
 - CI/release workflows declare least-privilege `contents: read` where applicable;
 - Firebase deployment continues to use short-lived Workload Identity Federation with `id-token: write` rather than a committed service-account key;
 - `gha-creds-*.json` is ignored to prevent generated Google auth credentials from entering Git/release artifacts.
@@ -105,6 +120,10 @@ Do not switch production callables to `enforceAppCheck: true` until native App C
 ### Non-AI abuse controls
 
 AI endpoints have per-user daily quotas. Invite/admin and other sensitive non-AI callables still need a deliberate rate/abuse-control design before a broad public launch, especially invite-code probing/regeneration and destructive administrative operations.
+
+### Full-editor collaboration semantics
+
+Inventory +/- controls are transaction-safe. The complete item editor still saves an absolute snapshot including quantity, so two users editing the same item form concurrently can intentionally follow last-write-wins semantics. If collaborative simultaneous form edits become important, introduce a trusted server-side patch/version strategy rather than silently assuming the current snapshot is authoritative.
 
 ### Live provider/device validation
 
