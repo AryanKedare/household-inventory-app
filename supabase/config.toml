@@ -5,8 +5,19 @@ project_id = "homestock"
 [functions.health]
 verify_jwt = false
 
-# create-expense validates the caller inside the function with auth.getUser().
-# Keeping the legacy gateway JWT verifier disabled is compatible with Supabase's
-# newer publishable-key model while preserving authenticated-only access.
+# User-facing functions validate the bearer token inside the function with
+# auth.getUser(). Keeping the legacy gateway verifier disabled supports the
+# current publishable-key model while preserving authenticated-only behavior.
 [functions.create-expense]
+verify_jwt = false
+
+[functions.household-ai]
+verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = false
+
+# This backend-only function authenticates the Supabase secret key in the
+# `apikey` header. The key is supplied by the hosted cron job from Vault.
+[functions.process-notifications]
 verify_jwt = false

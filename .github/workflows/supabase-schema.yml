@@ -30,9 +30,6 @@ jobs:
           trap 'kill "$edge_pid" 2>/dev/null || true' EXIT
 
           ready=false
-          health_status="000"
-          create_expense_status="000"
-
           for attempt in $(seq 1 40); do
             if ! kill -0 "$edge_pid" 2>/dev/null; then
               echo "Supabase Edge Function server exited before becoming ready."
@@ -40,38 +37,30 @@ jobs:
               exit 1
             fi
 
-            health_status="$(curl --silent --show-error \
-              --output /tmp/health.json \
-              --write-out '%{http_code}' \
-              http://127.0.0.1:54321/functions/v1/health || true)"
+            health_status="$(curl --silent --show-error --output /tmp/health.json --write-out '%{http_code}' http://127.0.0.1:54321/functions/v1/health || true)"
+            create_expense_status="$(curl --silent --show-error --output /tmp/create-expense.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{}' http://127.0.0.1:54321/functions/v1/create-expense || true)"
+            ai_status="$(curl --silent --show-error --output /tmp/household-ai.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"action":"category"}' http://127.0.0.1:54321/functions/v1/household-ai || true)"
+            delete_status="$(curl --silent --show-error --output /tmp/delete-account.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{}' http://127.0.0.1:54321/functions/v1/delete-account || true)"
+            push_status="$(curl --silent --show-error --output /tmp/process-notifications.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{}' http://127.0.0.1:54321/functions/v1/process-notifications || true)"
 
-            create_expense_status="$(curl --silent --show-error \
-              --output /tmp/create-expense.json \
-              --write-out '%{http_code}' \
-              --request POST \
-              --header 'content-type: application/json' \
-              --data '{}' \
-              http://127.0.0.1:54321/functions/v1/create-expense || true)"
-
-            if [ "$health_status" = "200" ] && \
-               grep -q '"ok":true' /tmp/health.json && \
-               [ "$create_expense_status" = "400" ] && \
-               grep -q '"error":"Missing Authorization header"' /tmp/create-expense.json; then
+            if [ "$health_status" = "200" ] && grep -q '"ok":true' /tmp/health.json && \
+               [ "$create_expense_status" = "400" ] && grep -q 'Missing Authorization header' /tmp/create-expense.json && \
+               [ "$ai_status" = "400" ] && grep -q 'Missing Authorization header' /tmp/household-ai.json && \
+               [ "$delete_status" = "400" ] && grep -q 'Missing Authorization header' /tmp/delete-account.json && \
+               [ "$push_status" = "401" ] && grep -q 'unauthorized' /tmp/process-notifications.json; then
               ready=true
               break
             fi
-
             sleep 1
           done
 
           if [ "$ready" != true ]; then
-            echo "Edge Function smoke test did not reach the function handlers."
-            echo "health HTTP status: ${health_status}"
-            cat /tmp/health.json 2>/dev/null || true
-            echo
-            echo "create-expense HTTP status: ${create_expense_status}"
-            cat /tmp/create-expense.json 2>/dev/null || true
-            echo
+            echo "Edge Function smoke test did not reach every handler."
+            for file in health create-expense household-ai delete-account process-notifications; do
+              echo "--- ${file} ---"
+              cat "/tmp/${file}.json" 2>/dev/null || true
+              echo
+            done
             echo "--- Edge Function runtime log ---"
             cat /tmp/homestock-edge.log
             exit 1

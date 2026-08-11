@@ -7,14 +7,20 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
+import type { User } from '@supabase/supabase-js';
 
-import { isFirebaseConfigured } from '../config/env';
-import { getFirebaseServices } from '../services/firebase/client';
-import * as authService from '../services/firebase/authService';
+import { isSupabaseConfigured } from '../config/supabaseEnv';
+import { getSupabaseClient } from '../services/supabase/client';
+import * as authService from '../services/supabase/authService';
+
+export interface AppUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+}
 
 interface AuthContextValue {
-  user: User | null;
+  user: AppUser | null;
   loading: boolean;
   configured: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -24,21 +30,45 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function mapUser(user: User | null): AppUser | null {
+  if (!user) return null;
+  const displayName = user.user_metadata?.display_name;
+  return {
+    uid: user.id,
+    email: user.email ?? null,
+    displayName: typeof displayName === 'string' && displayName.trim() ? displayName.trim() : null,
+  };
+}
+
 export function AuthProvider({ children }: PropsWithChildren) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(isFirebaseConfigured);
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [loading, setLoading] = useState(isSupabaseConfigured);
 
   useEffect(() => {
-    const services = getFirebaseServices();
-    if (!services) {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
       setLoading(false);
       return undefined;
     }
 
-    return onAuthStateChanged(services.auth, (nextUser) => {
-      setUser(nextUser);
+    let active = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active) {
+        setUser(mapUser(data.session?.user ?? null));
+        setLoading(false);
+      }
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+      setUser(mapUser(session?.user ?? null));
       setLoading(false);
     });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
@@ -54,7 +84,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, configured: isFirebaseConfigured, signIn, signUp, signOut }),
+    () => ({ user, loading, configured: isSupabaseConfigured, signIn, signUp, signOut }),
     [user, loading, signIn, signUp, signOut],
   );
 
