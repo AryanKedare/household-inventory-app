@@ -25,6 +25,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export HOMESTOCK_INTERNAL_SECRET='ci-homestock-internal-secret'
           supabase functions serve --no-verify-jwt > /tmp/homestock-edge.log 2>&1 &
           edge_pid=$!
           trap 'kill "$edge_pid" 2>/dev/null || true' EXIT
@@ -35,6 +36,9 @@ jobs:
           category_status="000"
           bill_status="000"
           insights_status="000"
+          register_push_status="000"
+          notify_status="000"
+          receipts_status="000"
           smoke_household="00000000-0000-4000-8000-000000000000"
 
           for attempt in $(seq 1 50); do
@@ -81,6 +85,32 @@ jobs:
               --data "{\"householdId\":\"${smoke_household}\"}" \
               http://127.0.0.1:54321/functions/v1/generate-household-insights || true)"
 
+            register_push_status="$(curl --silent --show-error \
+              --output /tmp/register-push.json \
+              --write-out '%{http_code}' \
+              --request POST \
+              --header 'content-type: application/json' \
+              --data '{}' \
+              http://127.0.0.1:54321/functions/v1/register-push-device || true)"
+
+            notify_status="$(curl --silent --show-error \
+              --output /tmp/notify.json \
+              --write-out '%{http_code}' \
+              --request POST \
+              --header 'content-type: application/json' \
+              --header "x-homestock-internal-secret: ${HOMESTOCK_INTERNAL_SECRET}" \
+              --data '{"type":"UPDATE","table":"activities","schema":"public","record":{}}' \
+              http://127.0.0.1:54321/functions/v1/notify-household-activity || true)"
+
+            receipts_status="$(curl --silent --show-error \
+              --output /tmp/receipts.json \
+              --write-out '%{http_code}' \
+              --request POST \
+              --header 'content-type: application/json' \
+              --header "x-homestock-internal-secret: ${HOMESTOCK_INTERNAL_SECRET}" \
+              --data '{}' \
+              http://127.0.0.1:54321/functions/v1/process-push-receipts || true)"
+
             if [ "$health_status" = "200" ] && \
                grep -q '"ok":true' /tmp/health.json && \
                [ "$create_expense_status" = "400" ] && \
@@ -90,7 +120,13 @@ jobs:
                [ "$bill_status" = "400" ] && \
                grep -q '"error":"Missing Authorization header"' /tmp/bill.json && \
                [ "$insights_status" = "400" ] && \
-               grep -q '"error":"Missing Authorization header"' /tmp/insights.json; then
+               grep -q '"error":"Missing Authorization header"' /tmp/insights.json && \
+               [ "$register_push_status" = "400" ] && \
+               grep -q '"error":"Missing Authorization header"' /tmp/register-push.json && \
+               [ "$notify_status" = "200" ] && \
+               grep -q '"ignored":true' /tmp/notify.json && \
+               [ "$receipts_status" = "200" ] && \
+               grep -q '"processed":0' /tmp/receipts.json; then
               ready=true
               break
             fi
@@ -99,8 +135,8 @@ jobs:
           done
 
           if [ "$ready" != true ]; then
-            echo "Edge Function smoke test did not reach every function auth boundary."
-            for probe in health create-expense category bill insights; do
+            echo "Edge Function smoke test did not reach every function boundary."
+            for probe in health create-expense category bill insights register-push notify receipts; do
               echo "--- ${probe} ---"
               case "$probe" in
                 health) echo "HTTP ${health_status}" ;;
@@ -108,6 +144,9 @@ jobs:
                 category) echo "HTTP ${category_status}" ;;
                 bill) echo "HTTP ${bill_status}" ;;
                 insights) echo "HTTP ${insights_status}" ;;
+                register-push) echo "HTTP ${register_push_status}" ;;
+                notify) echo "HTTP ${notify_status}" ;;
+                receipts) echo "HTTP ${receipts_status}" ;;
               esac
               cat "/tmp/${probe}.json" 2>/dev/null || true
               echo
