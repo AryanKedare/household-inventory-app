@@ -46,7 +46,7 @@
     "@types/react": "~19.2.2",
     "@typescript-eslint/eslint-plugin": "^8.39.1",
     "@typescript-eslint/parser": "^8.39.1",
-    "eslint": "^9.33.0",
+    "eslint": "^10.8.1",
     "eslint-config-prettier": "^10.1.8",
     "firebase-tools": "^15.24.0",
     "prettier": "^3.6.2",
