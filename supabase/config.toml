@@ -1,0 +1,6 @@
+project_id = "homestock"
+
+# Public liveness endpoint used only to prove that the hosted Edge Functions
+# deployment is online. Every business function keeps JWT verification enabled.
+[functions.health]
+verify_jwt = false
