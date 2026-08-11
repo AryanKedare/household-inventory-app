@@ -30,32 +30,47 @@ jobs:
           trap 'kill "$edge_pid" 2>/dev/null || true' EXIT
 
           ready=false
+          health_status="000"
+          create_expense_status="000"
+
           for attempt in $(seq 1 40); do
-            if curl --silent --fail http://127.0.0.1:54321/functions/v1/health >/tmp/health.json; then
+            if ! kill -0 "$edge_pid" 2>/dev/null; then
+              echo "Supabase Edge Function server exited before becoming ready."
+              cat /tmp/homestock-edge.log
+              exit 1
+            fi
+
+            health_status="$(curl --silent --show-error \
+              --output /tmp/health.json \
+              --write-out '%{http_code}' \
+              http://127.0.0.1:54321/functions/v1/health || true)"
+
+            create_expense_status="$(curl --silent --show-error \
+              --output /tmp/create-expense.json \
+              --write-out '%{http_code}' \
+              --request POST \
+              --header 'content-type: application/json' \
+              --data '{}' \
+              http://127.0.0.1:54321/functions/v1/create-expense || true)"
+
+            if [ "$health_status" = "200" ] && \
+               grep -q '"ok":true' /tmp/health.json && \
+               [ "$create_expense_status" = "400" ] && \
+               grep -q '"error":"Missing Authorization header"' /tmp/create-expense.json; then
               ready=true
               break
             fi
+
             sleep 1
           done
 
           if [ "$ready" != true ]; then
-            cat /tmp/homestock-edge.log
-            exit 1
-          fi
-          grep -q '"ok":true' /tmp/health.json
-
-          create_expense_status="$(curl --silent --show-error \
-            --output /tmp/create-expense.json \
-            --write-out '%{http_code}' \
-            --request POST \
-            --header 'content-type: application/json' \
-            --data '{}' \
-            http://127.0.0.1:54321/functions/v1/create-expense)"
-
-          if [ "$create_expense_status" != "400" ] || \
-             ! grep -q '"error":"Missing Authorization header"' /tmp/create-expense.json; then
-            echo "create-expense smoke test failed with HTTP ${create_expense_status}"
-            cat /tmp/create-expense.json
+            echo "Edge Function smoke test did not reach the function handlers."
+            echo "health HTTP status: ${health_status}"
+            cat /tmp/health.json 2>/dev/null || true
+            echo
+            echo "create-expense HTTP status: ${create_expense_status}"
+            cat /tmp/create-expense.json 2>/dev/null || true
             echo
             echo "--- Edge Function runtime log ---"
             cat /tmp/homestock-edge.log
