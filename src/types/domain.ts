@@ -1,4 +1,4 @@
-import type { Timestamp } from 'firebase/firestore';
+import type { AppTimestamp } from './timestamp';
 
 export type HouseholdRole = 'owner' | 'admin' | 'member';
 export type ItemStatus = 'available' | 'low_stock' | 'out_of_stock';
@@ -37,8 +37,8 @@ export interface UserProfile {
     notificationsEnabled: boolean;
     theme: 'system' | 'light' | 'dark';
   };
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: AppTimestamp;
+  updatedAt: AppTimestamp;
 }
 
 export interface Household {
@@ -47,8 +47,8 @@ export interface Household {
   createdBy: string;
   inviteCode: string;
   currency: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: AppTimestamp;
+  updatedAt: AppTimestamp;
 }
 
 export interface HouseholdMember {
@@ -56,7 +56,7 @@ export interface HouseholdMember {
   displayName: string;
   email: string;
   role: HouseholdRole;
-  joinedAt: Timestamp;
+  joinedAt: AppTimestamp;
 }
 
 export interface InventoryItem {
@@ -79,12 +79,12 @@ export interface InventoryItem {
     storeName: string;
     priceCents: number;
     quantity: number;
-    purchasedAt: Timestamp;
+    purchasedAt: AppTimestamp;
   };
   addedBy: string;
   updatedBy: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: AppTimestamp;
+  updatedAt: AppTimestamp;
 }
 
 export interface ShoppingListItem {
@@ -99,9 +99,9 @@ export interface ShoppingListItem {
   priority: ShoppingPriority;
   status: ShoppingItemStatus;
   addedBy: string;
-  addedAt: Timestamp;
+  addedAt: AppTimestamp;
   purchasedBy?: string;
-  purchasedAt?: Timestamp;
+  purchasedAt?: AppTimestamp;
 }
 
 export interface Purchase {
@@ -116,8 +116,8 @@ export interface Purchase {
   totalPriceCents: number;
   currency: string;
   purchasedBy: string;
-  purchasedAt: Timestamp;
-  createdAt: Timestamp;
+  purchasedAt: AppTimestamp;
+  createdAt: AppTimestamp;
 }
 
 export interface PriceHistory {
@@ -132,7 +132,7 @@ export interface PriceHistory {
   percentageChange: number | null;
   currency: string;
   changedBy: string;
-  createdAt: Timestamp;
+  createdAt: AppTimestamp;
 }
 
 export interface ExpenseAllocation {
@@ -170,11 +170,11 @@ export interface HouseholdExpense {
   debts: ExpenseDebt[];
   settlementStatus?: 'open' | 'partial' | 'settled';
   currency: string;
-  expenseDate: Timestamp;
+  expenseDate: AppTimestamp;
   notes?: string | null;
   createdBy: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: AppTimestamp;
+  updatedAt: AppTimestamp;
 }
 
 export interface ExpenseSettlement {
@@ -186,7 +186,7 @@ export interface ExpenseSettlement {
   currency: string;
   note?: string | null;
   recordedBy: string;
-  createdAt: Timestamp;
+  createdAt: AppTimestamp;
 }
 
 export interface MonthlyBudget {
@@ -196,8 +196,8 @@ export interface MonthlyBudget {
   totalLimitCents: number;
   categoryLimitsCents: Partial<Record<ExpenseCategoryId, number>>;
   updatedBy: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: AppTimestamp;
+  updatedAt: AppTimestamp;
 }
 
 export type ActivityType =
@@ -221,5 +221,5 @@ export interface Activity {
   entityId?: string;
   actorId: string;
   metadata?: Record<string, unknown>;
-  createdAt: Timestamp;
+  createdAt: AppTimestamp;
 }
