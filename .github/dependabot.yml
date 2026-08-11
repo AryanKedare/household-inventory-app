@@ -10,6 +10,17 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - dependencies
+    # Expo SDK owns the compatible native/runtime dependency set. Upgrade these
+    # together during an Expo SDK maintenance PR (for example with `expo install --fix`)
+    # instead of allowing independent Dependabot drift.
+    ignore:
+      - dependency-name: expo
+      - dependency-name: 'expo-*'
+      - dependency-name: react
+      - dependency-name: react-native
+      - dependency-name: '@react-native-async-storage/async-storage'
+      - dependency-name: react-native-safe-area-context
+      - dependency-name: react-native-screens
 
   - package-ecosystem: npm
     directory: /functions
@@ -21,6 +32,12 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - dependencies
+    # Cloud Functions runs Node 22. Keep Node typings on the same runtime major
+    # while still allowing compatible 22.x type updates.
+    ignore:
+      - dependency-name: '@types/node'
+        update-types:
+          - 'version-update:semver-major'
 
   - package-ecosystem: github-actions
     directory: /
