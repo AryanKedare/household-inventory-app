@@ -1,4 +1,4 @@
-name: Supabase Schema
+name: Supabase Backend
 on:
   pull_request:
     paths:
@@ -7,9 +7,9 @@ on:
 permissions:
   contents: read
 jobs:
-  schema:
+  backend:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -17,7 +17,39 @@ jobs:
       - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf
         with:
           version: 2.101.0
-      - run: supabase db start
-      - run: supabase db lint --level error
+      - name: Start fresh Supabase stack and apply migrations
+        run: supabase start
+      - name: Lint database functions and schema
+        run: supabase db lint --level error
+      - name: Smoke test Edge Function bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase functions serve --no-verify-jwt > /tmp/homestock-edge.log 2>&1 &
+          edge_pid=$!
+          trap 'kill "$edge_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          for attempt in $(seq 1 40); do
+            if curl --silent --fail http://127.0.0.1:54321/functions/v1/health >/tmp/health.json; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" != true ]; then
+            cat /tmp/homestock-edge.log
+            exit 1
+          fi
+          grep -q '"ok":true' /tmp/health.json
+
+          curl --silent --show-error \
+            --request POST \
+            --header 'content-type: application/json' \
+            --data '{}' \
+            http://127.0.0.1:54321/functions/v1/create-expense \
+            >/tmp/create-expense.json
+          grep -q 'Missing Authorization header' /tmp/create-expense.json
       - if: always()
         run: supabase stop --no-backup || true
