@@ -10,22 +10,22 @@ Once deployed, Supabase hosts these pieces for you:
 - Authentication
 - Realtime subscriptions
 - Edge Functions
-- Edge Function secrets (including `GROQ_API_KEY`)
+- Edge Function secrets, including `GROQ_API_KEY`
 - scheduled database/Edge Function jobs added later in the migration
 
-Expo/EAS remains the cloud build service for Android and iOS. Your laptop is only needed while you are changing code or manually running a command.
+Expo/EAS remains the cloud build service for Android and iOS. Your laptop is only needed while you are changing code or manually running a deployment command.
 
-> Free-plan note: Supabase can pause a low-activity Free project after roughly seven days of insufficient activity. Open the project in the dashboard and press **Resume project** if that happens. Normal household use should create activity, but the Free plan is not an uptime guarantee.
+> Free-plan note: Supabase can pause a low-activity Free project after a period of insufficient activity. A Free project is useful for hobby use but is not an uptime guarantee.
 
-## 1. Create one free Supabase project
+## 1. Create one hosted Supabase project
 
 1. Sign in at the Supabase Dashboard.
 2. Create a new project.
 3. A simple name such as `homestock` is fine.
-4. Choose a region close to the household (for Ireland, choose an available nearby EU region).
+4. Choose an available EU region close to the household.
 5. Save the database password somewhere private. Do not commit it to Git.
 
-There is no dev/staging/production split for the hobby setup. Use this one project.
+There is no required dev/staging/production split for the hobby setup. One project is enough until HomeStock needs a formal production environment strategy.
 
 ## 2. Get the two mobile-safe values
 
@@ -43,28 +43,21 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_REPLACE_ME
 
 The publishable key is intentionally safe to ship in a mobile app when Row Level Security is enabled. Never put a Supabase secret key or Groq key in an `EXPO_PUBLIC_*` variable.
 
-During the migration, keep the existing Firebase values in `.env.local` too. They can be deleted after the final Firebase-removal PR.
+During the migration, keep the existing Firebase values too. They can be deleted after the final Firebase-removal PR.
 
-## 3. Apply the database schema
+## 3. Apply all database migrations
 
-### Easiest method: Supabase Dashboard
+The repository now contains multiple ordered migrations for the foundation, household lifecycle, inventory/shopping/purchases, Finance/Go Dutch, and hosted AI quotas.
 
-1. Open **SQL Editor**.
-2. Open `supabase/migrations/20260811123000_initial_homestock.sql` from this repository.
-3. Paste it into a new query and run it.
-4. Then run `supabase/migrations/20260811123500_harden_foundation.sql`.
-
-The migrations create household, inventory, shopping, purchase, finance, debt, settlement, budget, activity, device, AI, and push-receipt structures with Row Level Security.
-
-### CLI method (optional)
-
-If you prefer the CLI later:
+The safest CLI path is:
 
 ```bash
 npx supabase login
 npx supabase link --project-ref YOUR_PROJECT_REF
 npx supabase db push
 ```
+
+If you use the Dashboard SQL Editor instead, run every file in `supabase/migrations/` in filename order. Do not stop after the original foundation migrations.
 
 Do not run `db reset` against the hosted hobby project once it contains real household data.
 
@@ -84,17 +77,21 @@ Or with the CLI:
 npx supabase secrets set GROQ_API_KEY=YOUR_GROQ_KEY --project-ref YOUR_PROJECT_REF
 ```
 
-Supabase automatically provides its own hosted URL and backend keys to deployed Edge Functions. Do not create a mobile `EXPO_PUBLIC_GROQ_API_KEY`.
+Supabase provides its own hosted URL and backend keys to deployed Edge Functions. Do not create a mobile `EXPO_PUBLIC_GROQ_API_KEY`.
 
-## 5. Deploy the first hosted function
+## 5. Deploy the hosted Edge Functions
 
-The first function is only a health check. It proves the backend runs when your laptop is off.
+Deploy the functions currently implemented by the migration:
 
 ```bash
 npx supabase functions deploy health --project-ref YOUR_PROJECT_REF
+npx supabase functions deploy create-expense --project-ref YOUR_PROJECT_REF
+npx supabase functions deploy suggest-expense-category --project-ref YOUR_PROJECT_REF
+npx supabase functions deploy analyze-household-bill --project-ref YOUR_PROJECT_REF
+npx supabase functions deploy generate-household-insights --project-ref YOUR_PROJECT_REF
 ```
 
-After deployment, the endpoint is:
+The health endpoint is public only as a liveness check:
 
 ```text
 https://YOUR_PROJECT_REF.supabase.co/functions/v1/health
@@ -106,11 +103,11 @@ It should return:
 {"ok":true,"service":"homestock-supabase"}
 ```
 
-Shut the laptop lid and call the URL from your phone. The response still comes from Supabase's hosted Edge Function.
+The finance and AI functions are not public application operations. They validate the signed-in Supabase user inside the handler and enforce household membership before privileged work. `GROQ_API_KEY` and the Supabase backend secret key never go into the mobile bundle.
 
 ## 6. What not to do yet
 
-Until the migration PRs are complete:
+Until the final cutover PR is complete:
 
 - do not remove Firebase dependencies;
 - do not delete the Firebase project if you already created one;
@@ -119,17 +116,22 @@ Until the migration PRs are complete:
 - do not expose `GROQ_API_KEY`;
 - do not disable Row Level Security to make an error disappear.
 
-## 7. Migration order
+## 7. Migration progress
 
-HomeStock moves feature-by-feature so the app remains usable:
+Completed hosted layers:
 
 1. Supabase schema/RLS/client foundation
 2. Auth and profiles
 3. households/members/invites
 4. inventory/shopping/purchases/realtime
-5. finance/Go Dutch/budgets/settlements
-6. Groq AI and push-processing Edge Functions
-7. account/household deletion
-8. remove Firebase packages, Functions, rules, and Firebase CI
+5. Finance/Go Dutch/budgets/settlements
+6. Groq AI Edge Functions and atomic AI quotas
+
+Still to migrate before final cutover:
+
+- Expo push fan-out and receipt processing on hosted Supabase infrastructure
+- account deletion and remaining lifecycle operations
+- mobile screen/service import cutover where Firebase is still the active fallback
+- Firebase package/Functions/rules/CI removal after real-device hosted verification
 
 The final target is one hosted Supabase project plus Expo/EAS. No laptop needs to remain running for normal use.
