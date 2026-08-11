@@ -13,11 +13,11 @@ import {
   writeBatch,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
 
 import type { InventoryItem } from '../../types/domain';
 import { getItemStatus } from '../../utils/inventoryStatus';
 import { getFirebaseServices } from './client';
+import { adjustInventoryQuantity } from './inventoryQuantityService';
 
 export interface InventoryItemInput {
   name: string;
@@ -157,12 +157,7 @@ export async function setQuantity(
     return;
   }
 
-  const adjustQuantity = httpsCallable<
-    { householdId: string; itemId: string; delta: number },
-    { itemId: string; quantity: number; status: InventoryItem['status'] }
-  >(requireServices().functions, 'adjustInventoryQuantity');
-
-  await adjustQuantity({ householdId, itemId: item.id, delta });
+  await adjustInventoryQuantity(householdId, item.id, delta);
 }
 
 export async function deleteItem(householdId: string, itemId: string): Promise<void> {
