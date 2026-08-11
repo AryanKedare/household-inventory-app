@@ -5,7 +5,7 @@ import { LoadingView } from '../components/common/LoadingView';
 import { useAuth } from '../context/AuthContext';
 import { useHousehold } from '../context/HouseholdContext';
 import { SetupRequiredScreen } from '../screens/main/SetupRequiredScreen';
-import { refreshPushTokenIfAlreadyAllowed } from '../services/firebase/notificationService';
+import { refreshPushTokenIfAlreadyAllowed } from '../services/supabase/notificationService';
 import { colors } from '../theme/colors';
 import { AuthNavigator } from './AuthNavigator';
 import { HouseholdNavigator } from './HouseholdNavigator';
