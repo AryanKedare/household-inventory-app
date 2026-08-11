@@ -1,6 +1,12 @@
 project_id = "homestock"
 
 # Public liveness endpoint used only to prove that the hosted Edge Functions
-# deployment is online. Every business function keeps JWT verification enabled.
+# deployment is online.
 [functions.health]
+verify_jwt = false
+
+# create-expense validates the caller inside the function with auth.getUser().
+# Keeping the legacy gateway JWT verifier disabled is compatible with Supabase's
+# newer publishable-key model while preserving authenticated-only access.
+[functions.create-expense]
 verify_jwt = false
