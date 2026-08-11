@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { subscribeToActivities } from '../services/firebase/activityService';
+import { subscribeToActivities } from '../services/supabase/activityService';
 import type { Activity } from '../types/domain';
 
 export function useActivities(householdId: string | null) {
