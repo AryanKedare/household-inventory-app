@@ -71,6 +71,10 @@ function mapPrice(row: PriceRow): PriceHistory {
   };
 }
 
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 export function subscribeToItemPurchases(
   householdId: string,
   itemId: string,
@@ -79,33 +83,32 @@ export function subscribeToItemPurchases(
 ): () => void {
   const supabase = requireSupabaseClient();
   let active = true;
-  const refresh = () => {
-    void supabase
-      .from('purchases')
-      .select(
-        'id,inventory_item_id,shopping_item_id,item_name,store,quantity,unit,unit_price_cents,total_cents,currency,purchased_by,purchased_at,created_at',
-      )
-      .eq('household_id', householdId)
-      .eq('inventory_item_id', itemId)
-      .order('purchased_at', { ascending: false })
-      .limit(30)
-      .then(({ data, error }) => {
-        if (!active) return;
-        if (error) throw error;
-        onPurchases(((data ?? []) as unknown as PurchaseRow[]).map(mapPurchase));
-      })
-      .catch((error: unknown) => {
-        if (active) onError(error instanceof Error ? error : new Error(String(error)));
-      });
+
+  const refresh = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('purchases')
+        .select(
+          'id,inventory_item_id,shopping_item_id,item_name,store,quantity,unit,unit_price_cents,total_cents,currency,purchased_by,purchased_at,created_at',
+        )
+        .eq('household_id', householdId)
+        .eq('inventory_item_id', itemId)
+        .order('purchased_at', { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      if (active) onPurchases(((data ?? []) as unknown as PurchaseRow[]).map(mapPurchase));
+    } catch (error) {
+      if (active) onError(asError(error));
+    }
   };
 
-  refresh();
+  void refresh();
   const channel = supabase
     .channel(`purchases:${householdId}:${itemId}`)
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'purchases', filter: `household_id=eq.${householdId}` },
-      refresh,
+      () => void refresh(),
     )
     .subscribe();
 
@@ -123,33 +126,32 @@ export function subscribeToItemPriceHistory(
 ): () => void {
   const supabase = requireSupabaseClient();
   let active = true;
-  const refresh = () => {
-    void supabase
-      .from('price_history')
-      .select(
-        'id,inventory_item_id,purchase_id,item_name,store,previous_unit_price_cents,unit_price_cents,difference_cents,percentage_change,currency,changed_by,recorded_at',
-      )
-      .eq('household_id', householdId)
-      .eq('inventory_item_id', itemId)
-      .order('recorded_at', { ascending: false })
-      .limit(30)
-      .then(({ data, error }) => {
-        if (!active) return;
-        if (error) throw error;
-        onHistory(((data ?? []) as unknown as PriceRow[]).map(mapPrice));
-      })
-      .catch((error: unknown) => {
-        if (active) onError(error instanceof Error ? error : new Error(String(error)));
-      });
+
+  const refresh = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('price_history')
+        .select(
+          'id,inventory_item_id,purchase_id,item_name,store,previous_unit_price_cents,unit_price_cents,difference_cents,percentage_change,currency,changed_by,recorded_at',
+        )
+        .eq('household_id', householdId)
+        .eq('inventory_item_id', itemId)
+        .order('recorded_at', { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      if (active) onHistory(((data ?? []) as unknown as PriceRow[]).map(mapPrice));
+    } catch (error) {
+      if (active) onError(asError(error));
+    }
   };
 
-  refresh();
+  void refresh();
   const channel = supabase
     .channel(`price-history:${householdId}:${itemId}`)
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'price_history', filter: `household_id=eq.${householdId}` },
-      refresh,
+      () => void refresh(),
     )
     .subscribe();
 
