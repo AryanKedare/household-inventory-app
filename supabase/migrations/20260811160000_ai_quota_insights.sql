@@ -56,5 +56,4 @@ revoke all on function public.consume_ai_quota(uuid, text) from public, anon, au
 grant execute on function public.consume_ai_quota(uuid, text) to service_role;
 
 create unique index if not exists ai_insights_household_period_type_unique
-  on public.ai_insights(household_id, period_start, insight_type)
-  where period_start is not null;
+  on public.ai_insights(household_id, period_start, insight_type);
