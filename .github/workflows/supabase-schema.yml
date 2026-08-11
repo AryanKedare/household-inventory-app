@@ -44,12 +44,22 @@ jobs:
           fi
           grep -q '"ok":true' /tmp/health.json
 
-          curl --silent --show-error \
+          create_expense_status="$(curl --silent --show-error \
+            --output /tmp/create-expense.json \
+            --write-out '%{http_code}' \
             --request POST \
             --header 'content-type: application/json' \
             --data '{}' \
-            http://127.0.0.1:54321/functions/v1/create-expense \
-            >/tmp/create-expense.json
-          grep -q 'Missing Authorization header' /tmp/create-expense.json
+            http://127.0.0.1:54321/functions/v1/create-expense)"
+
+          if [ "$create_expense_status" != "400" ] || \
+             ! grep -q '"error":"Missing Authorization header"' /tmp/create-expense.json; then
+            echo "create-expense smoke test failed with HTTP ${create_expense_status}"
+            cat /tmp/create-expense.json
+            echo
+            echo "--- Edge Function runtime log ---"
+            cat /tmp/homestock-edge.log
+            exit 1
+          fi
       - if: always()
         run: supabase stop --no-backup || true
