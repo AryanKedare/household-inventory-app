@@ -1,4 +1,4 @@
-name: Supabase Schema
+name: Supabase Backend
 on:
   pull_request:
     paths:
@@ -7,9 +7,9 @@ on:
 permissions:
   contents: read
 jobs:
-  schema:
+  backend:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -17,7 +17,64 @@ jobs:
       - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf
         with:
           version: 2.101.0
-      - run: supabase db start
-      - run: supabase db lint --level error
+      - name: Start fresh Supabase stack and apply migrations
+        run: supabase start
+      - name: Lint database functions and schema
+        run: supabase db lint --level error
+      - name: Smoke test Edge Function bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase functions serve --no-verify-jwt > /tmp/homestock-edge.log 2>&1 &
+          edge_pid=$!
+          trap 'kill "$edge_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          health_status="000"
+          create_expense_status="000"
+
+          for attempt in $(seq 1 40); do
+            if ! kill -0 "$edge_pid" 2>/dev/null; then
+              echo "Supabase Edge Function server exited before becoming ready."
+              cat /tmp/homestock-edge.log
+              exit 1
+            fi
+
+            health_status="$(curl --silent --show-error \
+              --output /tmp/health.json \
+              --write-out '%{http_code}' \
+              http://127.0.0.1:54321/functions/v1/health || true)"
+
+            create_expense_status="$(curl --silent --show-error \
+              --output /tmp/create-expense.json \
+              --write-out '%{http_code}' \
+              --request POST \
+              --header 'content-type: application/json' \
+              --data '{}' \
+              http://127.0.0.1:54321/functions/v1/create-expense || true)"
+
+            if [ "$health_status" = "200" ] && \
+               grep -q '"ok":true' /tmp/health.json && \
+               [ "$create_expense_status" = "400" ] && \
+               grep -q '"error":"Missing Authorization header"' /tmp/create-expense.json; then
+              ready=true
+              break
+            fi
+
+            sleep 1
+          done
+
+          if [ "$ready" != true ]; then
+            echo "Edge Function smoke test did not reach the function handlers."
+            echo "health HTTP status: ${health_status}"
+            cat /tmp/health.json 2>/dev/null || true
+            echo
+            echo "create-expense HTTP status: ${create_expense_status}"
+            cat /tmp/create-expense.json 2>/dev/null || true
+            echo
+            echo "--- Edge Function runtime log ---"
+            cat /tmp/homestock-edge.log
+            exit 1
+          fi
       - if: always()
         run: supabase stop --no-backup || true
