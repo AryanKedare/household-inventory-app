@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   subscribeToHouseholdExpenses,
   subscribeToMonthlyBudget,
-} from '../services/firebase/financeService';
+} from '../services/supabase/financeService';
 import type { ExpenseCategoryId, HouseholdExpense, MonthlyBudget } from '../types/domain';
 
 export function currentBudgetPeriod(date = new Date()): string {
