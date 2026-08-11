@@ -11,7 +11,7 @@ class DateTimestamp implements AppTimestamp {
 }
 
 export function timestampFromDate(value: Date): AppTimestamp {
-  return new DateTimestamp(value);
+  return new DateTimestamp(new Date(value.getTime()));
 }
 
 export function timestampFromIso(value: string): AppTimestamp {
