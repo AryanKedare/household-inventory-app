@@ -59,6 +59,12 @@ Deno.serve(async (req) => {
 
   try {
     requireInternalSecret(req);
+  } catch (error) {
+    console.error('process-push-receipts rejected request', error);
+    return jsonResponse({ error: error instanceof Error ? error.message : 'Unauthorized request.' }, 401);
+  }
+
+  try {
     const admin = createAdminClient();
     const now = new Date();
     const { data: pending, error: pendingError } = await admin
@@ -162,7 +168,7 @@ Deno.serve(async (req) => {
 
     return jsonResponse({ ok: true, processed, disabled, retried, expired });
   } catch (error) {
-    console.error('process-push-receipts rejected request', error);
-    return jsonResponse({ error: error instanceof Error ? error.message : 'Invalid receipt request.' }, 401);
+    console.error('process-push-receipts failed', error);
+    return jsonResponse({ error: 'Unable to process Expo push receipts.' }, 500);
   }
 });
