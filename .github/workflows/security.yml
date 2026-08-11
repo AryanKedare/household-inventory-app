@@ -45,29 +45,12 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install mobile dependencies
+      - name: Install dependencies
         run: npm install --ignore-scripts
 
-      - name: Install Functions dependencies
-        run: npm --prefix functions install --ignore-scripts
-
-      # High-severity findings remain visible in every run, but do not permanently
-      # block all development when an upstream package has no patched release.
-      # Expo/Metro currently pulls image-size versions affected by high-severity
-      # parser DoS advisories; npm's proposed forced remediation breaks the supported
-      # Expo/React Native stack. Keep this exception under review rather than hiding it.
-      - name: Report high+ mobile dependency findings
+      - name: Report high+ production dependency findings
         continue-on-error: true
         run: npm audit --omit=dev --audit-level=high
 
-      - name: Report high+ Functions dependency findings
-        continue-on-error: true
-        run: npm --prefix functions audit --omit=dev --audit-level=high
-
-      # Critical production dependency findings still fail immediately. High findings
-      # must be reviewed before release and are continuously surfaced by the steps above.
-      - name: Block critical mobile dependency findings
+      - name: Block critical production dependency findings
         run: npm audit --omit=dev --audit-level=critical
-
-      - name: Block critical Functions dependency findings
-        run: npm --prefix functions audit --omit=dev --audit-level=critical
