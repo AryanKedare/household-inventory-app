@@ -19,3 +19,14 @@ verify_jwt = false
 
 [functions.generate-household-insights]
 verify_jwt = false
+
+[functions.register-push-device]
+verify_jwt = false
+
+# Internal functions are protected with HOMESTOCK_INTERNAL_SECRET because they
+# are invoked by a database webhook / cron job rather than a signed-in user.
+[functions.notify-household-activity]
+verify_jwt = false
+
+[functions.process-push-receipts]
+verify_jwt = false
