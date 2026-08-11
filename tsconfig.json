@@ -22,6 +22,6 @@
     "App.tsx",
     "src/**/*.ts",
     "src/**/*.tsx",
-    "tests/**/*.ts"
+    "tests/unit/**/*.ts"
   ]
 }
