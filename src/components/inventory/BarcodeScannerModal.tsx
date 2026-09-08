@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
+import { Camera, type CameraPermissionStatus } from 'react-native-vision-camera';
+import { CodeScanner } from 'react-native-vision-camera-barcode-scanner';
 
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -13,21 +14,20 @@ interface BarcodeScannerModalProps {
 }
 
 export function BarcodeScannerModal({ visible, onClose, onScanned }: BarcodeScannerModalProps) {
-  const [permission, requestPermission] = useCameraPermissions();
+  const [permission, setPermission] = useState<CameraPermissionStatus>(
+    Camera.getCameraPermissionStatus(),
+  );
   const [locked, setLocked] = useState(false);
 
   useEffect(() => {
     if (visible) {
       setLocked(false);
+      setPermission(Camera.getCameraPermissionStatus());
     }
   }, [visible]);
 
-  function handleScan(result: BarcodeScanningResult) {
-    if (locked || !result.data) {
-      return;
-    }
-    setLocked(true);
-    onScanned(result.data.trim());
+  async function requestPermission() {
+    setPermission(await Camera.requestCameraPermission());
   }
 
   return (
@@ -43,11 +43,7 @@ export function BarcodeScannerModal({ visible, onClose, onScanned }: BarcodeScan
           </Pressable>
         </View>
 
-        {!permission ? (
-          <View style={styles.messageWrap}>
-            <Text style={styles.message}>Checking camera permission…</Text>
-          </View>
-        ) : !permission.granted ? (
+        {permission !== 'granted' ? (
           <View style={styles.messageWrap}>
             <Text style={styles.messageTitle}>Camera access is required</Text>
             <Text style={styles.message}>
@@ -57,21 +53,16 @@ export function BarcodeScannerModal({ visible, onClose, onScanned }: BarcodeScan
           </View>
         ) : (
           <View style={styles.cameraWrap}>
-            <CameraView
+            <CodeScanner
               style={StyleSheet.absoluteFill}
-              facing="back"
-              barcodeScannerSettings={{
-                barcodeTypes: [
-                  'ean13',
-                  'ean8',
-                  'upc_a',
-                  'upc_e',
-                  'code128',
-                  'code39',
-                  'itf14',
-                ],
+              isActive={visible && !locked}
+              barcodeFormats={['ean-13', 'ean-8', 'upc-a', 'upc-e', 'code-128', 'code-39', 'itf']}
+              onBarcodeScanned={(barcodes) => {
+                const value = barcodes[0]?.value?.trim();
+                if (locked || !value) return;
+                setLocked(true);
+                onScanned(value);
               }}
-              onBarcodeScanned={locked ? undefined : handleScan}
             />
             <View pointerEvents="none" style={styles.overlay}>
               <View style={styles.target} />
@@ -113,7 +104,7 @@ const styles = StyleSheet.create({
   messageTitle: { color: colors.text, fontSize: 22, fontWeight: '800' },
   message: { color: colors.textMuted, lineHeight: 22 },
   cameraWrap: { flex: 1, overflow: 'hidden' },
-  overlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+  overlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   target: {
     width: '82%',
     height: 190,
