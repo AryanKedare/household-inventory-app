@@ -54,6 +54,12 @@ try {
   );
 
   replaceOnce(
+    join(generated, 'ios', 'Podfile'),
+    'platform :ios, min_ios_version_supported',
+    "platform :ios, '15.5'",
+  );
+
+  replaceOnce(
     join(generated, 'ios', 'HomeStock', 'Info.plist'),
     '\t<key>NSLocationWhenInUseUsageDescription</key>\n\t<string></string>',
     '\t<key>NSCameraUsageDescription</key>\n\t<string>Allow HomeStock to scan household product barcodes.</string>',
@@ -63,7 +69,7 @@ try {
   cpSync(join(generated, 'android'), androidPath, { recursive: true });
 
   console.log('\nNative projects created successfully.');
-  console.log('Next: npm install, then on macOS run npm run pods, followed by npm run ios.');
+  console.log('Next: npm install, bundle install, npm run pods, then npm run ios.');
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });
 }
