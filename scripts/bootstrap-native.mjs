@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -14,6 +14,14 @@ if (existsSync(iosPath) || existsSync(androidPath)) {
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'homestock-native-'));
 const generated = join(tempRoot, 'HomeStock');
+
+function replaceOnce(path, search, replacement) {
+  const source = readFileSync(path, 'utf8');
+  if (!source.includes(search)) {
+    throw new Error(`Unable to patch generated native file: ${path}`);
+  }
+  writeFileSync(path, source.replace(search, replacement));
+}
 
 try {
   execFileSync(
@@ -31,6 +39,24 @@ try {
       'com.aryankedare.householdinventory',
     ],
     { stdio: 'inherit' },
+  );
+
+  replaceOnce(
+    join(generated, 'android', 'app', 'src', 'main', 'AndroidManifest.xml'),
+    '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
+    '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n\n    <uses-permission android:name="android.permission.CAMERA" />',
+  );
+
+  replaceOnce(
+    join(generated, 'android', 'app', 'build.gradle'),
+    'apply plugin: "com.facebook.react"',
+    'apply plugin: "com.facebook.react"\n\napply from: project(\':react-native-config\').projectDir.getPath() + "/dotenv.gradle"',
+  );
+
+  replaceOnce(
+    join(generated, 'ios', 'HomeStock', 'Info.plist'),
+    '\t<key>NSLocationWhenInUseUsageDescription</key>\n\t<string></string>',
+    '\t<key>NSCameraUsageDescription</key>\n\t<string>Allow HomeStock to scan household product barcodes.</string>',
   );
 
   cpSync(join(generated, 'ios'), iosPath, { recursive: true });
