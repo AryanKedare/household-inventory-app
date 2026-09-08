@@ -6,10 +6,9 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
 
 import { useAuth } from './AuthContext';
-import { getFirebaseServices } from '../services/firebase/client';
+import { getSupabaseClient } from '../services/supabase/client';
 
 interface HouseholdContextValue {
   householdId: string | null;
@@ -30,25 +29,47 @@ export function HouseholdProvider({ children }: PropsWithChildren) {
       return undefined;
     }
 
-    const services = getFirebaseServices();
-    if (!services) {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
       setLoading(false);
       return undefined;
     }
 
+    let active = true;
     setLoading(true);
-    return onSnapshot(
-      doc(services.db, 'users', user.uid),
-      (snapshot) => {
-        const value = snapshot.data()?.defaultHouseholdId;
-        setHouseholdId(typeof value === 'string' && value.length > 0 ? value : null);
-        setLoading(false);
-      },
-      () => {
+
+    const refresh = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('default_household_id')
+        .eq('id', user.uid)
+        .maybeSingle();
+
+      if (!active) return;
+      if (error) {
         setHouseholdId(null);
         setLoading(false);
-      },
-    );
+        return;
+      }
+      const value = data?.default_household_id;
+      setHouseholdId(typeof value === 'string' && value.length > 0 ? value : null);
+      setLoading(false);
+    };
+
+    void refresh();
+    const channel = supabase
+      .channel(`profile-household:${user.uid}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.uid}` },
+        () => void refresh(),
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
   }, [configured, user]);
 
   const value = useMemo(() => ({ householdId, loading }), [householdId, loading]);

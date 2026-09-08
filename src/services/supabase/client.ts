@@ -10,9 +10,7 @@ let client: SupabaseClient | null = null;
 let autoRefreshListenerRegistered = false;
 
 function registerNativeAuthRefresh(supabase: SupabaseClient) {
-  if (Platform.OS === 'web' || autoRefreshListenerRegistered) {
-    return;
-  }
+  if (Platform.OS === 'web' || autoRefreshListenerRegistered) return;
 
   autoRefreshListenerRegistered = true;
   AppState.addEventListener('change', (state) => {
@@ -25,13 +23,8 @@ function registerNativeAuthRefresh(supabase: SupabaseClient) {
 }
 
 export function getSupabaseClient(): SupabaseClient | null {
-  if (!isSupabaseConfigured) {
-    return null;
-  }
-
-  if (client) {
-    return client;
-  }
+  if (!isSupabaseConfigured) return null;
+  if (client) return client;
 
   client = createClient(supabaseConfig.url, supabaseConfig.publishableKey, {
     auth: {
@@ -51,9 +44,8 @@ export function requireSupabaseClient(): SupabaseClient {
   const supabase = getSupabaseClient();
   if (!supabase) {
     throw new Error(
-      'Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.',
+      'Supabase is not configured. Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in the native .env file.',
     );
   }
-
   return supabase;
 }

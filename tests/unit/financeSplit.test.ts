@@ -4,7 +4,7 @@ import test from 'node:test';
 import {
   calculateExpenseSplit,
   participantSubtotalsFromLines,
-} from '../../functions/src/financeMath';
+} from '../../src/utils/financeMath';
 
 test('restaurant discount is allocated proportionally and reconciles to the paid total', () => {
   const result = calculateExpenseSplit({

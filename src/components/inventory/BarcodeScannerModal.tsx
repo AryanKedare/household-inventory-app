@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
+import { useCameraPermission } from 'react-native-vision-camera';
+import { CodeScanner } from 'react-native-vision-camera-barcode-scanner';
 
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -13,22 +14,16 @@ interface BarcodeScannerModalProps {
 }
 
 export function BarcodeScannerModal({ visible, onClose, onScanned }: BarcodeScannerModalProps) {
-  const [permission, requestPermission] = useCameraPermissions();
+  const { hasPermission, canRequestPermission, requestPermission } = useCameraPermission();
   const [locked, setLocked] = useState(false);
+  const [scannerError, setScannerError] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
       setLocked(false);
+      setScannerError(null);
     }
   }, [visible]);
-
-  function handleScan(result: BarcodeScanningResult) {
-    if (locked || !result.data) {
-      return;
-    }
-    setLocked(true);
-    onScanned(result.data.trim());
-  }
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -43,40 +38,45 @@ export function BarcodeScannerModal({ visible, onClose, onScanned }: BarcodeScan
           </Pressable>
         </View>
 
-        {!permission ? (
-          <View style={styles.messageWrap}>
-            <Text style={styles.message}>Checking camera permission…</Text>
-          </View>
-        ) : !permission.granted ? (
+        {!hasPermission ? (
           <View style={styles.messageWrap}>
             <Text style={styles.messageTitle}>Camera access is required</Text>
             <Text style={styles.message}>
               HomeStock only uses the camera here to read the barcode you point it at.
             </Text>
-            <AppButton title="Allow camera" onPress={() => void requestPermission()} />
+            {canRequestPermission ? (
+              <AppButton title="Allow camera" onPress={() => void requestPermission()} />
+            ) : (
+              <Text style={styles.message}>
+                Camera permission is disabled for HomeStock. Enable it from your device settings and reopen the scanner.
+              </Text>
+            )}
           </View>
         ) : (
           <View style={styles.cameraWrap}>
-            <CameraView
+            <CodeScanner
               style={StyleSheet.absoluteFill}
-              facing="back"
-              barcodeScannerSettings={{
-                barcodeTypes: [
-                  'ean13',
-                  'ean8',
-                  'upc_a',
-                  'upc_e',
-                  'code128',
-                  'code39',
-                  'itf14',
-                ],
+              isActive={visible && !locked}
+              barcodeFormats={['ean-13', 'ean-8', 'upc-a', 'upc-e', 'code-128', 'code-39', 'itf']}
+              onBarcodeScanned={(barcodes) => {
+                const value = barcodes[0]?.rawValue?.trim();
+                if (locked || !value) return;
+                setLocked(true);
+                onScanned(value);
               }}
-              onBarcodeScanned={locked ? undefined : handleScan}
+              onError={(error) => {
+                setScannerError(error instanceof Error ? error.message : 'Unable to scan barcodes.');
+              }}
             />
             <View pointerEvents="none" style={styles.overlay}>
               <View style={styles.target} />
               <Text style={styles.hint}>Keep the barcode inside the frame</Text>
             </View>
+            {scannerError ? (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorText}>{scannerError}</Text>
+              </View>
+            ) : null}
             {locked ? (
               <View style={styles.lockedBanner}>
                 <Text style={styles.lockedText}>Barcode captured…</Text>
@@ -113,7 +113,15 @@ const styles = StyleSheet.create({
   messageTitle: { color: colors.text, fontSize: 22, fontWeight: '800' },
   message: { color: colors.textMuted, lineHeight: 22 },
   cameraWrap: { flex: 1, overflow: 'hidden' },
-  overlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   target: {
     width: '82%',
     height: 190,
@@ -131,6 +139,16 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     fontWeight: '700',
   },
+  errorBanner: {
+    position: 'absolute',
+    left: spacing.xl,
+    right: spacing.xl,
+    top: spacing.xl,
+    padding: spacing.md,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+  },
+  errorText: { color: colors.danger, textAlign: 'center', fontWeight: '700' },
   lockedBanner: {
     position: 'absolute',
     left: spacing.xl,

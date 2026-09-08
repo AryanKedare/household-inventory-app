@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { subscribeToShoppingList } from '../services/firebase/shoppingListService';
+import { subscribeToShoppingList } from '../services/supabase/shoppingListService';
 import type { ShoppingListItem } from '../types/domain';
 
 export function useShoppingList(householdId: string | null) {

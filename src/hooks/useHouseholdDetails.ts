@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   subscribeToHousehold,
   subscribeToHouseholdMembers,
-} from '../services/firebase/householdReadService';
+} from '../services/supabase/householdReadService';
 import type { Household, HouseholdMember, HouseholdRole } from '../types/domain';
 
 export function useHouseholdDetails(householdId: string | null, uid?: string) {

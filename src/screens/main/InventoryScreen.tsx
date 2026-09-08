@@ -12,8 +12,8 @@ import { ItemEditorModal } from '../../components/inventory/ItemEditorModal';
 import { useAuth } from '../../context/AuthContext';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useInventory } from '../../hooks/useInventory';
-import * as inventoryService from '../../services/firebase/inventoryService';
-import * as shoppingService from '../../services/firebase/shoppingListService';
+import * as inventoryService from '../../services/supabase/inventoryService';
+import * as shoppingService from '../../services/supabase/shoppingListService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -62,13 +62,8 @@ export function InventoryScreen() {
       });
   }, [categoryFilter, items, search, sortBy, statusFilter]);
 
-  if (loading) {
-    return <LoadingView label="Loading inventory…" />;
-  }
-
-  if (!householdId || !user) {
-    return null;
-  }
+  if (loading) return <LoadingView label="Loading inventory…" />;
+  if (!householdId || !user) return null;
 
   const activeHouseholdId = householdId;
   const activeUser = user;
@@ -111,9 +106,7 @@ export function InventoryScreen() {
   }
 
   function confirmDelete() {
-    if (!editingItem) {
-      return;
-    }
+    if (!editingItem) return;
     const target = editingItem;
     Alert.alert('Delete item?', `${target.name} will be removed from household inventory.`, [
       { text: 'Cancel', style: 'cancel' },
@@ -176,34 +169,18 @@ export function InventoryScreen() {
           <Text style={styles.subtitle}>{items.length} household items</Text>
         </View>
         <View style={styles.headerActions}>
-          <AppButton
-            title="Scan"
-            variant="secondary"
-            onPress={() => setScannerVisible(true)}
-            style={styles.headerButton}
-          />
+          <AppButton title="Scan" variant="secondary" onPress={() => setScannerVisible(true)} style={styles.headerButton} />
           <AppButton title="+ Add" onPress={openAdd} style={styles.headerButton} />
         </View>
       </View>
 
-      <AppInput
-        label="Search"
-        placeholder="Milk, cleaning, snacks…"
-        value={search}
-        onChangeText={setSearch}
-      />
+      <AppInput label="Search" placeholder="Milk, cleaning, snacks…" value={search} onChangeText={setSearch} />
 
       <View style={styles.filters}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           {categories.map((category) => (
-            <Pressable
-              key={category}
-              onPress={() => setCategoryFilter(category)}
-              style={[styles.chip, categoryFilter === category && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, categoryFilter === category && styles.chipTextActive]}>
-                {category}
-              </Text>
+            <Pressable key={category} onPress={() => setCategoryFilter(category)} style={[styles.chip, categoryFilter === category && styles.chipActive]}>
+              <Text style={[styles.chipText, categoryFilter === category && styles.chipTextActive]}>{category}</Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -215,26 +192,14 @@ export function InventoryScreen() {
             ['low_stock', 'Low'],
             ['out_of_stock', 'Out'],
           ].map(([value, label]) => (
-            <Pressable
-              key={value}
-              onPress={() => setStatusFilter(value as 'all' | ItemStatus)}
-              style={[styles.chip, statusFilter === value && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, statusFilter === value && styles.chipTextActive]}>
-                {label}
-              </Text>
+            <Pressable key={value} onPress={() => setStatusFilter(value as 'all' | ItemStatus)} style={[styles.chip, statusFilter === value && styles.chipActive]}>
+              <Text style={[styles.chipText, statusFilter === value && styles.chipTextActive]}>{label}</Text>
             </Pressable>
           ))}
           <Text style={styles.sortLabel}>Sort:</Text>
           {(['name', 'quantity', 'price'] as const).map((value) => (
-            <Pressable
-              key={value}
-              onPress={() => setSortBy(value)}
-              style={[styles.chip, sortBy === value && styles.sortChipActive]}
-            >
-              <Text style={[styles.chipText, sortBy === value && styles.sortChipTextActive]}>
-                {value === 'name' ? 'Name' : value === 'quantity' ? 'Qty' : 'Price'}
-              </Text>
+            <Pressable key={value} onPress={() => setSortBy(value)} style={[styles.chip, sortBy === value && styles.sortChipActive]}>
+              <Text style={[styles.chipText, sortBy === value && styles.sortChipTextActive]}>{value === 'name' ? 'Name' : value === 'quantity' ? 'Qty' : 'Price'}</Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -261,9 +226,7 @@ export function InventoryScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>{search ? 'No matches' : 'No inventory yet'}</Text>
-            <Text style={styles.emptyText}>
-              {search ? 'Try another search.' : 'Add the first item used in your household.'}
-            </Text>
+            <Text style={styles.emptyText}>{search ? 'Try another search.' : 'Add the first item used in your household.'}</Text>
           </View>
         }
       />
@@ -281,18 +244,8 @@ export function InventoryScreen() {
         onDelete={editingItem ? async () => confirmDelete() : undefined}
       />
 
-      <BarcodeScannerModal
-        visible={scannerVisible}
-        onClose={() => setScannerVisible(false)}
-        onScanned={(barcode) => void handleBarcode(barcode)}
-      />
-
-      <ItemHistoryModal
-        visible={historyItem !== null}
-        householdId={activeHouseholdId}
-        item={historyItem}
-        onClose={() => setHistoryItem(null)}
-      />
+      <BarcodeScannerModal visible={scannerVisible} onClose={() => setScannerVisible(false)} onScanned={(barcode) => void handleBarcode(barcode)} />
+      <ItemHistoryModal visible={historyItem !== null} householdId={activeHouseholdId} item={historyItem} onClose={() => setHistoryItem(null)} />
     </Screen>
   );
 }
@@ -307,14 +260,7 @@ const styles = StyleSheet.create({
   headerButton: { minHeight: 44, paddingHorizontal: spacing.md },
   filters: { gap: spacing.sm, marginTop: spacing.md },
   chips: { gap: spacing.sm, alignItems: 'center' },
-  chip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
+  chip: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   chipActive: { backgroundColor: '#E8EEFF', borderColor: colors.primary },
   sortChipActive: { backgroundColor: colors.dark, borderColor: colors.dark },
   chipText: { color: colors.textMuted, fontWeight: '700', fontSize: 12 },

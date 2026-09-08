@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   subscribeToHouseholdAiInsights,
   type HouseholdAiInsights,
-} from '../services/firebase/aiService';
+} from '../services/supabase/aiService';
 
 export function useHouseholdAiInsights(householdId: string | null, period: string) {
   const [insights, setInsights] = useState<HouseholdAiInsights | null>(null);

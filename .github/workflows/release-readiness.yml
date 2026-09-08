@@ -20,32 +20,34 @@ jobs:
         with:
           node-version: 22
 
-      - name: Setup Java for Firebase Emulator
-        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Install mobile dependencies
+      - name: Install dependencies
         run: npm install
 
-      - name: Install function dependencies
-        run: npm --prefix functions install
+      - name: Verify application
+        run: npm run verify
 
-      - name: Verify application and backend
-        run: |
-          npm run typecheck
-          npm run lint
-          npm test
-          npm run functions:build
-          npm run test:functions
-          npm run test:rules
-
-      - name: Require production App Check enforcement
+      - name: Ensure retired platforms are absent
         shell: bash
         run: |
-          if grep -R --line-number --fixed-string 'enforceAppCheck: false' functions/src; then
-            echo 'Production release blocked: callable Functions still contain enforceAppCheck: false.'
+          if grep -R --line-number -E "from ['\"](expo|firebase)(/|['\"])|require\(['\"](expo|firebase)" src App.tsx index.js package.json 2>/dev/null; then
+            echo 'Production release blocked: Expo or Firebase runtime imports remain.'
+            exit 1
+          fi
+          node <<'NODE'
+          const pkg = require('./package.json');
+          const names = Object.keys({ ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) });
+          const retired = names.filter((name) => name === 'expo' || name.startsWith('expo-') || name === 'firebase');
+          if (retired.length) {
+            console.error(`Production release blocked: retired dependencies remain: ${retired.join(', ')}`);
+            process.exit(1);
+          }
+          NODE
+
+      - name: Ensure server secrets are not exposed to mobile source
+        shell: bash
+        run: |
+          if grep -R --line-number -E 'GROQ_API_KEY[[:space:]]*=|SUPABASE_SERVICE_ROLE' src app.json .env.example 2>/dev/null; then
+            echo 'Production release blocked: possible server-secret exposure in mobile configuration.'
             exit 1
           fi
 
@@ -57,37 +59,14 @@ jobs:
             exit 1
           fi
 
-      - name: Reject placeholder Firebase project aliases
-        shell: bash
-        run: |
-          node <<'NODE'
-          const fs = require('fs');
-          const config = JSON.parse(fs.readFileSync('.firebaserc', 'utf8'));
-          const aliases = config.projects || {};
-          const values = Object.values(aliases);
-          if (!aliases.dev || !aliases.staging || !aliases.prod) {
-            console.error('Production release blocked: dev/staging/prod Firebase aliases are required.');
-            process.exit(1);
-          }
-          if (values.some((value) => /^household-app-(dev|staging|prod)$/.test(String(value)))) {
-            console.error('Production release blocked: placeholder Firebase project IDs remain.');
-            process.exit(1);
-          }
-          NODE
-
-      - name: Ensure Groq secret is not exposed to mobile source
-        shell: bash
-        run: |
-          if grep -R --line-number -E 'EXPO_PUBLIC_.*GROQ|GROQ_API_KEY[[:space:]]*=' src app.json .env.example 2>/dev/null; then
-            echo 'Production release blocked: possible Groq secret exposure in mobile/public configuration.'
-            exit 1
-          fi
-
       - name: Confirm release documentation exists
         run: |
           test -f docs/PRIVACY_POLICY.md
           test -f docs/TERMS_OF_USE.md
           test -f docs/PRODUCTION_RELEASE.md
+          test -f supabase/config.toml
+          test -d supabase/migrations
+          test -d supabase/functions
 
       - name: Release gate passed
-        run: echo 'Repository-level production release gates passed. Continue with local signed native builds, physical-device testing and store-console sign-off from docs/PRODUCTION_RELEASE.md.'
+        run: echo 'Repository-level release gates passed. Build and sign the native iOS/Android applications locally and complete physical-device/store-console checks.'

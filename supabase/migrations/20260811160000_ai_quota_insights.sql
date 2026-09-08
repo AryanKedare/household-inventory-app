@@ -24,19 +24,8 @@ begin
     raise exception using errcode = '22023', message = 'Unsupported AI operation.';
   end if;
 
-  insert into public.ai_usage (
-    user_id,
-    usage_date,
-    operation,
-    request_count,
-    updated_at
-  ) values (
-    p_user_id,
-    current_date,
-    p_operation,
-    1,
-    now()
-  )
+  insert into public.ai_usage (user_id, usage_date, operation, request_count, updated_at)
+  values (p_user_id, current_date, p_operation, 1, now())
   on conflict (user_id, usage_date, operation)
   do update
     set request_count = public.ai_usage.request_count + 1,

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   subscribeToItemPriceHistory,
   subscribeToItemPurchases,
-} from '../services/firebase/historyService';
+} from '../services/supabase/historyService';
 import type { PriceHistory, Purchase } from '../types/domain';
 
 export function useItemHistory(householdId: string | null, itemId: string | null) {

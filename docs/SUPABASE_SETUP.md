@@ -1,137 +1,69 @@
-# HomeStock Supabase Hobby Setup
+# Supabase Setup
 
-HomeStock is migrating from Firebase to one hosted Supabase project so the backend stays online without a laptop running.
+HomeStock uses Supabase as its application backend. Firebase is not required.
 
-## What stays online
+## Mobile environment
 
-Once deployed, Supabase hosts these pieces for you:
+Copy:
 
-- Postgres database
-- Authentication
-- Realtime subscriptions
-- Edge Functions
-- Edge Function secrets, including `GROQ_API_KEY`
-- scheduled database/Edge Function jobs added later in the migration
+```bash
+cp .env.example .env
+```
 
-Android and iOS binaries are compiled locally. Use the repository's `npm run android` / `npm run ios` commands for development builds and the corresponding `:release` commands for local release builds. No EAS Build service is required for compilation.
-
-> Free-plan note: Supabase can pause a low-activity Free project after a period of insufficient activity. A Free project is useful for hobby use but is not an uptime guarantee.
-
-## 1. Create one hosted Supabase project
-
-1. Sign in at the Supabase Dashboard.
-2. Create a new project.
-3. A simple name such as `homestock` is fine.
-4. Choose an available EU region close to the household.
-5. Save the database password somewhere private. Do not commit it to Git.
-
-There is no required dev/staging/production split for the hobby setup. One project is enough until HomeStock needs a formal production environment strategy.
-
-## 2. Get the two mobile-safe values
-
-Open the project's **Connect** dialog or **Settings > API Keys** and copy:
-
-- Project URL, such as `https://abcxyz.supabase.co`
-- Publishable key, starting with `sb_publishable_`
-
-Create `.env.local` in the repository root:
+Set only the mobile-safe project configuration:
 
 ```dotenv
-EXPO_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_REPLACE_ME
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_REPLACE_ME
 ```
 
-The publishable key is intentionally safe to ship in a mobile app when Row Level Security is enabled. Never put a Supabase secret key or Groq key in an `EXPO_PUBLIC_*` variable.
+The publishable key is intended for client use and is constrained by Supabase Auth and RLS. Never put a service-role key in the mobile application.
 
-During the migration, keep the existing Firebase values too. They can be deleted after the final Firebase-removal PR.
+## Local Supabase development
 
-## 3. Apply all database migrations
-
-The repository now contains multiple ordered migrations for the foundation, household lifecycle, inventory/shopping/purchases, Finance/Go Dutch, and hosted AI quotas.
-
-The safest CLI path is:
+Install the Supabase CLI using a supported installation method, then:
 
 ```bash
-npx supabase login
-npx supabase link --project-ref YOUR_PROJECT_REF
-npx supabase db push
+supabase start
+supabase db lint
 ```
 
-If you use the Dashboard SQL Editor instead, run every file in `supabase/migrations/` in filename order. Do not stop after the original foundation migrations.
+Migration files live in `supabase/migrations/`. Edge Functions live in `supabase/functions/`.
 
-Do not run `db reset` against the hosted hobby project once it contains real household data.
+## Hosted project
 
-## 4. Store the Groq key on the hosted backend
+For a hosted environment:
 
-The Groq key belongs in Edge Function secrets, never in Expo.
+1. create/select the Supabase project;
+2. link the local repository with the Supabase CLI;
+3. review and apply migrations in order;
+4. verify RLS policies;
+5. configure Auth settings;
+6. configure Edge Function secrets;
+7. deploy required Edge Functions;
+8. set the hosted project URL and publishable key in the mobile `.env` before compiling the app.
 
-Using the Dashboard:
+## AI secrets
 
-1. Open **Edge Functions > Secrets**.
-2. Add `GROQ_API_KEY`.
-3. Paste the Groq API key and save.
+AI provider credentials are server-side only. Configure them as Supabase Edge Function secrets, for example the provider key used by the Groq integration. They must not be prefixed or exposed as mobile/public environment variables.
 
-Or with the CLI:
+## Realtime
 
-```bash
-npx supabase secrets set GROQ_API_KEY=YOUR_GROQ_KEY --project-ref YOUR_PROJECT_REF
-```
+HomeStock subscribes to relevant Supabase Postgres changes for active household views. Ensure the migrations that add required tables to `supabase_realtime` publication have been applied.
 
-Supabase provides its own hosted URL and backend keys to deployed Edge Functions. Do not create a mobile `EXPO_PUBLIC_GROQ_API_KEY`.
+## Push notifications
 
-## 5. Deploy the hosted Edge Functions
+The Expo/Firebase remote push implementation has been retired. The cleanup migration removes the former Expo token/receipt tables. Background remote push is not required for the current application baseline.
 
-Deploy the functions currently implemented by the migration:
+## Validation
 
-```bash
-npx supabase functions deploy health --project-ref YOUR_PROJECT_REF
-npx supabase functions deploy create-expense --project-ref YOUR_PROJECT_REF
-npx supabase functions deploy suggest-expense-category --project-ref YOUR_PROJECT_REF
-npx supabase functions deploy analyze-household-bill --project-ref YOUR_PROJECT_REF
-npx supabase functions deploy generate-household-insights --project-ref YOUR_PROJECT_REF
-```
+Before using a production project:
 
-The health endpoint is public only as a liveness check:
-
-```text
-https://YOUR_PROJECT_REF.supabase.co/functions/v1/health
-```
-
-It should return:
-
-```json
-{"ok":true,"service":"homestock-supabase"}
-```
-
-The finance and AI functions are not public application operations. They validate the signed-in Supabase user inside the handler and enforce household membership before privileged work. `GROQ_API_KEY` and the Supabase backend secret key never go into the mobile bundle.
-
-## 6. What not to do yet
-
-Until the final cutover PR is complete:
-
-- do not remove Firebase dependencies;
-- do not delete the Firebase project if you already created one;
-- do not put live household data into both backends manually;
-- do not expose the Supabase secret key;
-- do not expose `GROQ_API_KEY`;
-- do not disable Row Level Security to make an error disappear.
-
-## 7. Migration progress
-
-Completed hosted layers:
-
-1. Supabase schema/RLS/client foundation
-2. Auth and profiles
-3. households/members/invites
-4. inventory/shopping/purchases/realtime
-5. Finance/Go Dutch/budgets/settlements
-6. Groq AI Edge Functions and atomic AI quotas
-
-Still to migrate before final cutover:
-
-- Expo push fan-out and receipt processing on hosted Supabase infrastructure
-- account deletion and remaining lifecycle operations
-- mobile screen/service import cutover where Firebase is still the active fallback
-- Firebase package/Functions/rules/CI removal after real-device hosted verification
-
-The final target is one hosted Supabase backend plus locally compiled iOS/Android applications. If Expo Push Service remains in use, its project metadata and push credentials are configured separately from compilation; EAS Build is not required.
+- create two test users;
+- create/join a household;
+- verify members can read/write only authorized household data;
+- verify non-members cannot query another household;
+- test inventory, shopping, purchase/history and finance RPCs;
+- test account deletion;
+- test AI Edge Functions if enabled;
+- run database lint and repository CI.

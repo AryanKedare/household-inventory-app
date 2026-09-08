@@ -7,7 +7,7 @@ import { AppInput } from '../../components/common/AppInput';
 import { Screen } from '../../components/common/Screen';
 import { useAuth } from '../../context/AuthContext';
 import { createHouseholdSchema, joinHouseholdSchema } from '../../schemas/household';
-import * as householdService from '../../services/firebase/householdService';
+import * as householdService from '../../services/supabase/householdService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -26,7 +26,6 @@ export function HouseholdSetupScreen() {
       setError(parsed.error.issues[0]?.message ?? 'Enter a household name.');
       return;
     }
-
     try {
       setError(null);
       setWorking('create');
@@ -44,7 +43,6 @@ export function HouseholdSetupScreen() {
       setError(parsed.error.issues[0]?.message ?? 'Enter a valid invite code.');
       return;
     }
-
     try {
       setError(null);
       setWorking('join');
@@ -60,38 +58,19 @@ export function HouseholdSetupScreen() {
     <Screen scroll>
       <Text style={styles.eyebrow}>ONE LAST STEP</Text>
       <Text style={styles.title}>Set up your household</Text>
-      <Text style={styles.subtitle}>
-        Create a new household or join people you live with using their invite code.
-      </Text>
+      <Text style={styles.subtitle}>Create a new household or join people you live with using their invite code.</Text>
 
       <AppCard style={styles.card}>
         <Text style={styles.cardTitle}>Create household</Text>
-        <AppInput
-          label="Household name"
-          placeholder="Apartment B307"
-          value={name}
-          onChangeText={setName}
-          maxLength={80}
-        />
+        <AppInput label="Household name" placeholder="Apartment B307" value={name} onChangeText={setName} maxLength={80} />
         <AppButton title="Create household" onPress={() => void create()} loading={working === 'create'} />
       </AppCard>
 
-      <View style={styles.orRow}>
-        <View style={styles.line} />
-        <Text style={styles.or}>OR</Text>
-        <View style={styles.line} />
-      </View>
+      <View style={styles.orRow}><View style={styles.line} /><Text style={styles.or}>OR</Text><View style={styles.line} /></View>
 
       <AppCard style={styles.card}>
         <Text style={styles.cardTitle}>Join household</Text>
-        <AppInput
-          label="Invite code"
-          placeholder="B307XY"
-          autoCapitalize="characters"
-          value={inviteCode}
-          onChangeText={setInviteCode}
-          maxLength={6}
-        />
+        <AppInput label="Invite code" placeholder="B307XY" autoCapitalize="characters" value={inviteCode} onChangeText={setInviteCode} maxLength={6} />
         <AppButton title="Join household" variant="secondary" onPress={() => void join()} loading={working === 'join'} />
       </AppCard>
 

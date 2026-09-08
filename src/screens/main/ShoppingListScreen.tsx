@@ -11,8 +11,8 @@ import {
 import { ShoppingItemCard } from '../../components/shopping/ShoppingItemCard';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useShoppingList } from '../../hooks/useShoppingList';
-import * as purchaseService from '../../services/firebase/purchaseService';
-import * as shoppingService from '../../services/firebase/shoppingListService';
+import * as purchaseService from '../../services/supabase/purchaseService';
+import * as shoppingService from '../../services/supabase/shoppingListService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -40,13 +40,8 @@ export function ShoppingListScreen() {
   }, [items]);
   const categories = sections.length;
 
-  if (loading) {
-    return <LoadingView label="Loading shopping list…" />;
-  }
-
-  if (!householdId) {
-    return null;
-  }
+  if (loading) return <LoadingView label="Loading shopping list…" />;
+  if (!householdId) return null;
 
   const activeHouseholdId = householdId;
 
@@ -71,9 +66,7 @@ export function ShoppingListScreen() {
           setBusyItemId(item.id);
           void shoppingService
             .removeShoppingItem(activeHouseholdId, item.id)
-            .catch((removeError) => {
-              Alert.alert('Could not remove item', toUserMessage(removeError));
-            })
+            .catch((removeError) => Alert.alert('Could not remove item', toUserMessage(removeError)))
             .finally(() => setBusyItemId(null));
         },
       },
@@ -81,10 +74,7 @@ export function ShoppingListScreen() {
   }
 
   async function completePurchase(value: PurchaseFormValue) {
-    if (!purchaseItem) {
-      return;
-    }
-
+    if (!purchaseItem) return;
     try {
       setBusyItemId(purchaseItem.id);
       await purchaseService.purchaseShoppingListItem({
@@ -109,9 +99,7 @@ export function ShoppingListScreen() {
           <Text style={styles.title}>Shopping</Text>
           <Text style={styles.subtitle}>Shared across your household</Text>
         </View>
-        <View style={styles.countBadge}>
-          <Text style={styles.countText}>{items.length}</Text>
-        </View>
+        <View style={styles.countBadge}><Text style={styles.countText}>{items.length}</Text></View>
       </View>
 
       <AppCard style={styles.summary}>
@@ -130,9 +118,7 @@ export function ShoppingListScreen() {
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
-        renderSectionHeader={({ section }) => (
-          <Text style={styles.sectionHeader}>{section.title.toUpperCase()}</Text>
-        )}
+        renderSectionHeader={({ section }) => <Text style={styles.sectionHeader}>{section.title.toUpperCase()}</Text>}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
@@ -149,49 +135,24 @@ export function ShoppingListScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>Your list is clear</Text>
-            <Text style={styles.emptyText}>
-              Mark an inventory item as finished or add it to the shopping list.
-            </Text>
+            <Text style={styles.emptyText}>Mark an inventory item as finished or add it to the shopping list.</Text>
           </View>
         }
       />
 
-      <PurchaseModal
-        visible={purchaseItem !== null}
-        item={purchaseItem}
-        onClose={() => setPurchaseItem(null)}
-        onSubmit={completePurchase}
-      />
+      <PurchaseModal visible={purchaseItem !== null} item={purchaseItem} onClose={() => setPurchaseItem(null)} onSubmit={completePurchase} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { paddingBottom: 0 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg },
   title: { color: colors.text, fontSize: typography.title, fontWeight: '800' },
   subtitle: { color: colors.textMuted, marginTop: spacing.xs },
-  countBadge: {
-    minWidth: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  countBadge: { minWidth: 42, height: 42, borderRadius: 21, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   countText: { color: colors.white, fontWeight: '800', fontSize: 16 },
-  summary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.dark,
-    borderColor: colors.dark,
-  },
+  summary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.dark, borderColor: colors.dark },
   summaryLabel: { color: '#B8C3D7', fontSize: 12, marginBottom: spacing.xs },
   summaryValue: { color: colors.white, fontSize: 28, fontWeight: '800' },
   summaryRight: { alignItems: 'flex-end' },
@@ -199,15 +160,7 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, marginTop: spacing.md },
   list: { paddingVertical: spacing.lg, paddingBottom: 32, flexGrow: 1 },
   itemWrap: { marginBottom: spacing.md },
-  sectionHeader: {
-    color: colors.primary,
-    backgroundColor: colors.background,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-  },
+  sectionHeader: { color: colors.primary, backgroundColor: colors.background, paddingTop: spacing.md, paddingBottom: spacing.sm, fontSize: 11, fontWeight: '900', letterSpacing: 1.2 },
   empty: { flex: 1, minHeight: 260, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   emptyTitle: { color: colors.text, fontSize: 20, fontWeight: '700' },
   emptyText: { color: colors.textMuted, textAlign: 'center', maxWidth: 300, lineHeight: 21 },

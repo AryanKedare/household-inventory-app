@@ -1,118 +1,85 @@
-# HomeStock Implementation Status
+# Implementation Status
 
 Updated: 8 September 2026
 
-## Current state
+## Current target
 
-HomeStock is an Expo SDK 57 / React Native / strict TypeScript application in an incremental Firebase-to-Supabase migration. Firebase remains active for parts of the mobile/backend runtime while Supabase-backed database, auth, realtime and Edge Function work is being introduced and verified.
+HomeStock is being finalized as a **bare React Native + Supabase** application.
 
-Mobile compilation is local. EAS Build and EAS Submit are no longer part of the repository build flow.
+### Mobile
 
-## Implemented
+- React Native Community CLI 0.86.3
+- React 19.2.3
+- native iOS and Android builds
+- VisionCamera barcode scanning
+- React Navigation
+- no Expo runtime
+- no EAS Build/Submit
+- no Firebase SDK
 
-### Application and household
+### Backend
 
-- persisted authentication
-- household creation/joining and role management
-- invite regeneration
-- ownership transfer, member removal and household leave
-- guarded account/household deletion flows
-- lifecycle/activity records
+- Supabase Auth
+- Supabase Postgres
+- Row Level Security
+- Supabase Realtime
+- SQL RPCs for transactional operations
+- Supabase Edge Functions for privileged and AI operations
+- server-side secrets managed by Supabase
 
-### Inventory, shopping and purchases
+## Completed migration areas
 
-- household-scoped inventory CRUD
-- filtering/sorting and low/out-of-stock state
-- barcode scanning
-- shared shopping list
-- transactional quantity and purchase operations
-- purchase and price history
-- concurrency coverage for critical mutations
+- Authentication and profile lifecycle moved to Supabase.
+- Household creation, joining, membership and administration moved to Supabase.
+- Inventory, quantity changes and barcode lookup moved to Supabase.
+- Shopping-list and purchase flows moved to Supabase.
+- Purchase/price history moved to Supabase.
+- Shared finance, budgets, debts and settlements moved to Supabase.
+- AI category suggestions, bill analysis and household insights run through Supabase Edge Functions.
+- Expo camera was replaced by a native VisionCamera barcode scanner.
+- Expo/EAS build and submission configuration was removed.
+- Firebase Functions/deployment workflow and Firebase package dependencies were removed.
+- Expo push-token and push-receipt schema is removed by migration.
+- Local native project creation is reproducible with `npm run native:bootstrap`.
 
-### Household finance
+## Notification status
 
-- direct and itemized shared expenses
-- deterministic discount/fee allocation and cent reconciliation
-- debt tracking
-- partial/full repayments
-- monthly/category budgets
-- concurrency-safe settlement behavior
+Remote background push notifications are intentionally not part of the migrated baseline because the former transport was Expo/Firebase based. Supabase Realtime continues to update household state while HomeStock is active.
 
-### AI
+A future remote-push implementation should be added as a separate native capability and must not require Expo or Firebase unless that architectural decision is explicitly reversed.
 
-- Groq-assisted category suggestions
-- review-first bill extraction
-- household spending insights
-- server-side Groq secret handling
-- per-user quotas and bounded provider requests
-- Supabase AI Edge Function migration work already present in the repository
+## Local build workflow
 
-### Notifications
-
-- Expo push registration and delivery logic
-- household activity fan-out
-- actor exclusion
-- ticket/receipt handling and invalid-token cleanup
-
-The complete notification migration to Supabase remains open work and should not be merged until its backend checks and real-device behavior are healthy.
-
-## Local mobile build flow
-
-Development builds:
+First-time native scaffolding:
 
 ```bash
-npm run android
+npm install
+cp .env.example .env
+npm run native:bootstrap
+```
+
+On macOS:
+
+```bash
+npm run pods
 npm run ios
 ```
 
-Release builds:
+Android:
 
 ```bash
-npm run android:release
-npm run ios:release
+npm run android
 ```
 
-Native projects can be generated/refreshed with:
+## Remaining release work
 
-```bash
-npm run prebuild
-```
+The migration is code-complete only after repository CI and Supabase schema checks pass on the final PR. Before production release also verify:
 
-Android requires the local Android SDK/toolchain. iOS requires macOS and Xcode. Signing credentials are required for distributable release binaries.
-
-## CI and security
-
-GitHub Actions are retained for code verification and security, not hosted mobile compilation. The repository includes:
-
-- strict TypeScript typecheck
-- ESLint
-- unit tests
-- Firebase Functions build/tests and Firestore Rules tests
-- Supabase schema/Edge Function backend checks
-- CodeQL
-- dependency audits
-- release-readiness checks
-
-Backend deployment workflows are separate from compiling the mobile application.
-
-## Migration work still open
-
-- complete notification/lifecycle Supabase migration
-- finish mobile service-import cutover
-- verify the migrated backend on physical devices
-- remove Firebase packages/Functions/rules/workflows only after the final cutover is proven
-- reconcile or close migration PRs once a single verified cutover path is selected
-
-## Release work still required
-
-- real backend environment/project configuration
-- production signing credentials
-- APNs/FCM/Expo push configuration as applicable
-- staging App Check/native attestation verification
-- live AI/push smoke tests
-- privacy/terms finalization
-- icons/screenshots/store metadata
-- TestFlight and Google Play internal/closed-track testing
-- final security review
-
-See `docs/PRODUCTION_RELEASE.md` for the release checklist and `docs/SUPABASE_SETUP.md` for the current Supabase setup.
+- production Supabase migrations are applied to the intended project;
+- RLS policies are reviewed against production requirements;
+- Supabase Auth settings and redirect configuration are correct;
+- Edge Function secrets are configured;
+- physical-device barcode scanning works on iOS and Android;
+- Xcode/Android release signing is configured;
+- privacy policy and store disclosures match the deployed architecture;
+- store archives/bundles are produced and smoke-tested locally.
