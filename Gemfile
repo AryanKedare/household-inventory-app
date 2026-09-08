@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
-ruby ">= 3.0", "< 4.0"
+ruby '3.3.12'
 
 # React Native 0.86/Xcode 16+ compatible CocoaPods toolchain.
 gem 'cocoapods', '1.16.2'
