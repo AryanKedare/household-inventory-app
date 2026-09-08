@@ -4,6 +4,7 @@
   "private": true,
   "main": "index.js",
   "scripts": {
+    "native:bootstrap": "node scripts/bootstrap-native.mjs",
     "start": "react-native start",
     "android": "react-native run-android",
     "android:release": "react-native run-android --mode release",
