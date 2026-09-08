@@ -13,7 +13,7 @@ Once deployed, Supabase hosts these pieces for you:
 - Edge Function secrets, including `GROQ_API_KEY`
 - scheduled database/Edge Function jobs added later in the migration
 
-Expo/EAS remains the cloud build service for Android and iOS. Your laptop is only needed while you are changing code or manually running a deployment command.
+Android and iOS binaries are compiled locally. Use the repository's `npm run android` / `npm run ios` commands for development builds and the corresponding `:release` commands for local release builds. No EAS Build service is required for compilation.
 
 > Free-plan note: Supabase can pause a low-activity Free project after a period of insufficient activity. A Free project is useful for hobby use but is not an uptime guarantee.
 
@@ -134,4 +134,4 @@ Still to migrate before final cutover:
 - mobile screen/service import cutover where Firebase is still the active fallback
 - Firebase package/Functions/rules/CI removal after real-device hosted verification
 
-The final target is one hosted Supabase project plus Expo/EAS. No laptop needs to remain running for normal use.
+The final target is one hosted Supabase backend plus locally compiled iOS/Android applications. If Expo Push Service remains in use, its project metadata and push credentials are configured separately from compilation; EAS Build is not required.
