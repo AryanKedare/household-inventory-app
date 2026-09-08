@@ -8,7 +8,6 @@
     "forceConsistentCasingInFileNames": true,
     "customConditions": ["react-native"],
     "types": ["node", "react"],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
