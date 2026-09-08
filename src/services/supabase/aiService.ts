@@ -42,33 +42,81 @@ export interface HouseholdAiInsights {
   model: string;
 }
 
-async function invoke<T>(body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await requireSupabaseClient().functions.invoke('household-ai', { body });
-  if (error) throw error;
-  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Supabase returned an invalid AI response.');
-  if (typeof data.error === 'string') throw new Error(data.error);
-  return data as T;
+function responseObject(data: unknown, label: string): Record<string, unknown> {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error(`Supabase returned an invalid ${label} response.`);
+  }
+  const record = data as Record<string, unknown>;
+  if (typeof record.error === 'string') throw new Error(record.error);
+  return record;
 }
 
-export function suggestExpenseCategory(input: {
+export async function suggestExpenseCategory(input: {
   householdId: string;
   title: string;
   merchantName?: string;
   notes?: string;
   lineDescriptions?: string[];
 }): Promise<SuggestedCategory> {
-  return invoke<SuggestedCategory>({ action: 'category', ...input });
+  const result = await requireSupabaseClient().functions.invoke('suggest-expense-category', {
+    body: input,
+  });
+  if (result.error) throw result.error;
+  return responseObject(result.data, 'category suggestion') as unknown as SuggestedCategory;
 }
 
-export function analyzeHouseholdBillText(input: {
+export async function analyzeHouseholdBillText(input: {
   householdId: string;
   billText: string;
 }): Promise<BillDraft> {
-  return invoke<BillDraft>({ action: 'bill', ...input });
+  const result = await requireSupabaseClient().functions.invoke('analyze-household-bill', {
+    body: input,
+  });
+  if (result.error) throw result.error;
+  return responseObject(result.data, 'bill analysis') as unknown as BillDraft;
 }
 
-export function generateHouseholdAiInsights(householdId: string): Promise<HouseholdAiInsights> {
-  return invoke<HouseholdAiInsights>({ action: 'insights', householdId });
+export async function generateHouseholdAiInsights(
+  householdId: string,
+): Promise<HouseholdAiInsights> {
+  const result = await requireSupabaseClient().functions.invoke('generate-household-insights', {
+    body: { householdId },
+  });
+  if (result.error) throw result.error;
+  return responseObject(result.data, 'household insight') as unknown as HouseholdAiInsights;
+}
+
+interface InsightRow {
+  payload: unknown;
+  model: string | null;
+}
+
+function mapInsight(row: InsightRow | null, period: string): HouseholdAiInsights | null {
+  if (!row || !row.payload || typeof row.payload !== 'object' || Array.isArray(row.payload)) {
+    return null;
+  }
+  const payload = row.payload as Record<string, unknown>;
+  if (typeof payload.summary !== 'string') return null;
+  return {
+    ...(payload as unknown as HouseholdAiInsights),
+    period: typeof payload.period === 'string' ? payload.period : period,
+    model: typeof payload.model === 'string' ? payload.model : row.model ?? '',
+  };
+}
+
+async function loadHouseholdAiInsights(
+  householdId: string,
+  period: string,
+): Promise<HouseholdAiInsights | null> {
+  const result = await requireSupabaseClient()
+    .from('ai_insights')
+    .select('payload,model')
+    .eq('household_id', householdId)
+    .eq('period_start', `${period}-01`)
+    .eq('insight_type', 'household_spending')
+    .maybeSingle();
+  if (result.error) throw result.error;
+  return mapInsight((result.data as InsightRow | null) ?? null, period);
 }
 
 export function subscribeToHouseholdAiInsights(
@@ -79,31 +127,35 @@ export function subscribeToHouseholdAiInsights(
 ): () => void {
   const supabase = requireSupabaseClient();
   let active = true;
-  const periodStart = `${period}-01`;
 
-  const refresh = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('ai_insights')
-        .select('payload')
-        .eq('household_id', householdId)
-        .eq('period_start', periodStart)
-        .eq('insight_type', 'spending')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      if (active) onData(data?.payload ? data.payload as HouseholdAiInsights : null);
-    } catch (error) {
-      if (active) onError(error instanceof Error ? error : new Error(String(error)));
-    }
+  const refresh = () => {
+    void loadHouseholdAiInsights(householdId, period)
+      .then((insights) => {
+        if (active) onData(insights);
+      })
+      .catch((error: unknown) => {
+        if (active) onError(error instanceof Error ? error : new Error(String(error)));
+      });
   };
 
-  void refresh();
+  refresh();
   const channel = supabase
-    .channel(`ai-insights:${householdId}:${period}`)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ai_insights', filter: `household_id=eq.${householdId}` }, () => void refresh())
-    .subscribe();
+    .channel(`household-ai:${householdId}:${period}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'ai_insights',
+        filter: `household_id=eq.${householdId}`,
+      },
+      refresh,
+    )
+    .subscribe((status) => {
+      if (active && (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT')) {
+        onError(new Error(`Supabase AI realtime channel ${status.toLowerCase()}.`));
+      }
+    });
 
   return () => {
     active = false;
