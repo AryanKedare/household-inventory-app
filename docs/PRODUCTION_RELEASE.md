@@ -1,273 +1,132 @@
-# HomeStock Production Release Runbook
+# Production Release
 
-This document separates repository-complete work from account/credential work that must be performed in the real Firebase, Expo, Apple, Google Play, and Groq accounts before public release.
+HomeStock production releases are built **locally** from bare React Native native projects. Expo/EAS and Firebase are not part of the release path.
 
-## 1. Release blockers that require operator input
+## 1. Repository gate
 
-Do not submit a public build until all of these are resolved:
+Run:
 
-- replace `[LEGAL_OPERATOR_NAME]`, `[CONTACT_EMAIL]`, `[COUNTRY_OR_ADDRESS]`, and effective dates in `docs/PRIVACY_POLICY.md` and `docs/TERMS_OF_USE.md`;
-- choose the real Firebase development, staging, and production project IDs;
-- link the Expo/EAS project and write the generated EAS project ID into app configuration;
-- provide production iOS/Android signing and push-notification credentials;
-- create the production Groq API key and select/review the required Groq retention policy;
-- confirm Apple App Store Connect and Google Play Console application records exist;
-- complete real-device testing and staging AI/push smoke tests.
+```bash
+npm install
+npm run verify
+```
 
-## 2. Environment model
+Run the `Production Release Readiness` GitHub workflow and the Supabase schema workflow. Both must pass for the release commit.
 
-Use three isolated Firebase environments:
+## 2. Supabase production checks
+
+Before building:
+
+- link the Supabase CLI to the intended production project;
+- review pending migrations;
+- apply migrations through the approved deployment process;
+- verify RLS is enabled and policies match household tenancy requirements;
+- configure Edge Function secrets such as the AI provider key;
+- deploy the required Edge Functions;
+- verify Auth email/redirect settings;
+- smoke-test household creation/joining, inventory, shopping, purchases and finance using non-production test accounts where appropriate.
+
+Do not place the Supabase service-role key or AI provider credentials in the mobile `.env` file.
+
+## 3. First native setup
+
+If the checkout does not yet contain generated native projects:
+
+```bash
+npm run native:bootstrap
+```
+
+The bootstrap creates standard React Native iOS/Android projects using application identifier:
 
 ```text
-development -> local/dev testing
-staging     -> real-device/TestFlight/closed-track verification
-production  -> public App Store / Google Play release
+com.aryankedare.householdinventory
 ```
 
-Never point development builds at the production Firestore project.
+After generation, native files can be maintained directly in Xcode/Gradle. Do not run Expo prebuild.
 
-The repository currently contains placeholder Firebase aliases. Replace them with real projects before deployment.
+## 4. iOS release
 
-## 3. Firebase project setup
+Requirements:
 
-For each environment:
+- macOS
+- current compatible Xcode
+- Apple Developer account/team
+- CocoaPods
 
-1. Create/select the Firebase project.
-2. Enable Email/Password Authentication.
-3. Create the required iOS and Android Firebase applications using the production bundle/package identifiers where appropriate.
-4. Configure Firestore.
-5. Configure Cloud Functions in `europe-west1` unless the architecture is intentionally changed.
-6. Ensure Cloud Scheduler can be used for the Expo push-receipt processor.
-7. Configure App Check before production enforcement.
-8. Configure budget/billing alerts in Google Cloud appropriate to the expected usage.
-
-Deploy rules/indexes/functions only after the relevant branch is green in CI.
-
-Typical deployment sequence after selecting the correct Firebase alias:
+Install dependencies:
 
 ```bash
-firebase use <environment-alias>
-firebase deploy --only firestore:rules,firestore:indexes
-firebase deploy --only functions
+npm install
+npm run pods
 ```
 
-Verify the selected project before every production deploy.
+Open the generated `.xcworkspace` in Xcode. Then:
 
-## 4. Groq AI secret
+1. select the HomeStock target;
+2. configure Signing & Capabilities with the production Apple team;
+3. verify bundle identifier and version/build number;
+4. build on at least one physical iPhone;
+5. test authentication, camera/barcode scanning and Supabase data flows;
+6. select a generic iOS device and use Product → Archive;
+7. validate the archive;
+8. upload through Xcode/App Store Connect.
 
-The mobile application must never contain the Groq API key.
-
-Set the server-side Firebase secret in each environment that should support AI:
+Command-line Release compilation can also be exercised with:
 
 ```bash
-firebase use <environment-alias>
-firebase functions:secrets:set GROQ_API_KEY
+npm run ios:release
 ```
 
-After deploying the AI Functions, perform a staging smoke test for:
+## 5. Android release
 
-- expense category suggestion;
-- bill-text extraction;
-- household insight generation;
-- daily AI quota behavior;
-- provider/network failure handling.
+Requirements:
 
-Review the Groq organization/project data controls before public release and document the selected retention policy in the public privacy policy. If Zero Data Retention is required for the deployment, confirm it is actually enabled for the production organization/project before claiming it.
+- Android Studio / Android SDK
+- supported JDK
+- production signing keystore
 
-## 5. App Check
-
-Production callable Functions should not be switched to `enforceAppCheck: true` until the shipped iOS and Android clients are proven to obtain valid App Check tokens on physical devices.
-
-Because HomeStock currently uses the Firebase JavaScript SDK inside Expo/React Native, the final native attestation integration must be validated in staging before enforcement. The production plan must provide platform-native attestation (for example, the appropriate Apple and Android App Check providers) and confirm that callable requests carry valid tokens.
-
-Safe rollout:
-
-1. implement/configure the native App Check provider in a development build;
-2. verify valid App Check requests in staging on physical iOS and Android devices;
-3. monitor rejected/invalid requests;
-4. enable enforcement for production callable Functions;
-5. repeat production smoke tests after enforcement.
-
-Never enable enforcement first and hope the client integration works afterward; that would make valid production calls fail.
-
-## 6. Expo/EAS project
-
-Link the repository to the real EAS project:
+Verify a local build:
 
 ```bash
-eas login
-eas init
+npm install
+npm run android
+npm run android:release
 ```
 
-Confirm the generated EAS project ID is present in app configuration and that development, preview, and production profiles point at the intended environment configuration.
+Before store upload, configure release signing in the generated Gradle project using secrets that are not committed to Git.
 
-Validate:
+Produce the required signed Android App Bundle with Gradle/Android Studio and upload it to Google Play Console.
 
-```bash
-eas build --platform ios --profile preview
-eas build --platform android --profile preview
-```
+## 6. Physical-device acceptance checks
 
-Install preview builds on physical devices before production builds.
+Test at minimum:
 
-## 7. Push notifications
-
-Before release:
-
-- configure APNs credentials for iOS;
-- configure FCM credentials for Android;
-- enable notifications on physical devices;
-- verify foreground/background receipt;
-- verify household actor exclusion where intended;
-- verify `DeviceNotRegistered` tokens become disabled after Expo ticket/receipt processing;
-- verify the scheduled receipt processor is deployed and executing.
-
-The application must continue to complete the underlying household action if push delivery fails.
-
-## 8. Staging test matrix
-
-Use at least two real household accounts on separate physical devices.
-
-### Authentication and household
-
-- sign up / sign in / sign out;
-- create household;
-- join via invite code;
-- regenerate invite;
-- owner/admin/member permissions;
-- ownership transfer;
-- leave household;
-- remove member;
-- sole-owner permanent household deletion;
-- non-owner in-app account deletion;
-- owner account deletion blocked until ownership is transferred or the owned household is deleted;
-- account deletion removes login/profile/device/membership data while preserving shared household accounting history required by remaining members.
-
-### Inventory and shopping
-
+- sign up, sign in, sign out and session restoration;
+- create and join a household;
+- household membership/admin actions;
 - add/edit/delete inventory;
-- barcode scan existing/new item;
-- simultaneous quantity updates from two devices;
-- low-stock/out-of-stock status;
-- add/remove/reactivate shopping item;
-- simultaneous purchase attempt from two devices;
-- purchase replenishment and price history.
+- barcode scanning on real hardware;
+- quantity and shopping-list flows;
+- purchase recording and price history;
+- expense creation, bill splitting, debts, repayments and budgets;
+- AI functions where enabled;
+- account deletion;
+- loss/recovery of network connectivity;
+- unauthorized cross-household access attempts.
 
-### Household finance / Go Dutch
+Remote background push notifications are not part of the current release baseline. Supabase Realtime updates data while the app is active.
 
-- groceries and non-grocery household categories;
-- direct per-person split;
-- itemized/shared-line split;
-- bill-level discount;
-- tax/service/delivery fees;
-- exact rounding on awkward cent totals;
-- current user's owed/owing balances;
-- partial repayment;
-- full repayment;
-- racing repayment attempts;
-- monthly overall budget;
-- category budgets.
+## 7. Store and legal checks
 
-### AI
+Ensure:
 
-- manual category suggestion;
-- incorrect category overridden by user;
-- bill text with named individual items;
-- shared item;
-- ambiguous participant remains review-required;
-- AI-missed line manually added;
-- hallucinated/incorrect line removed;
-- bill total mismatch warning;
-- saved reviewed bill produces deterministic debts;
-- aggregate household insights;
-- quota exhaustion;
-- Groq outage/failure UX.
+- privacy policy and terms contain final operator/contact details;
+- App Store privacy labels and Google Play Data Safety answers match actual data handling;
+- camera permission description accurately explains barcode scanning;
+- screenshots/listing copy do not claim unavailable push-notification behavior;
+- version/build numbers are unique;
+- production Supabase project, not a local/staging project, is configured in the release `.env`.
 
-### Resilience
+## 8. Go/no-go
 
-- offline launch with cached/authenticated state where supported;
-- connection loss during save;
-- repeated tap/submission attempts;
-- Firebase Functions unavailable;
-- notification permission denied;
-- camera permission denied and later enabled.
-
-## 9. Security release checks
-
-Before public release:
-
-- CI green on the exact production release commit;
-- no secrets committed to Git;
-- Groq secret only in Secret Manager;
-- production Firestore rules deployed from the reviewed commit;
-- all privileged membership/finance/settlement writes server-side;
-- App Check verified and enforced for production callables;
-- rate/abuse limits verified for sensitive endpoints;
-- concurrency tests passing;
-- household isolation tests passing;
-- household recursive deletion tested against realistic household data;
-- account deletion and ownership guard tested against realistic household data;
-- dependency/security findings reviewed rather than blindly force-upgraded.
-
-## 10. Privacy and store disclosures
-
-Before submission:
-
-- publish the final privacy policy at a stable public URL;
-- publish the final terms at a stable public URL if used in the product/store listing;
-- disclose account/contact data, household content, purchase/finance data, device/push data, and AI-provider processing accurately in Apple privacy disclosures and Google Play Data Safety;
-- disclose the distinction between in-app account deletion and household deletion, including retained shared household financial/audit history where applicable;
-- disclose the purpose of camera access (barcode scanning and any future receipt-image feature);
-- disclose push-notification usage;
-- ensure screenshots and store copy describe AI as assistive, not guaranteed financial advice;
-- confirm the minimum user age and jurisdiction-specific consumer/privacy requirements.
-
-## 11. Store assets
-
-Required production brand assets remain an operator/design task unless final approved assets are already supplied:
-
-- app icon;
-- splash/launch artwork;
-- App Store screenshots;
-- Google Play screenshots/feature artwork as required;
-- store description, support URL, privacy URL, and marketing URL if used.
-
-Do not ship placeholder assets.
-
-## 12. Production builds and submission
-
-After staging sign-off:
-
-```bash
-eas build --platform ios --profile production
-eas build --platform android --profile production
-```
-
-Then submit the reviewed signed binaries using EAS Submit or the relevant store tooling configured for the operator accounts.
-
-Submitting a binary is not the same as publishing it. Complete App Store Connect / Play Console metadata, privacy/data-safety forms, age/content declarations, screenshots, review notes, and release controls in the relevant store consoles.
-
-## 13. Final go/no-go
-
-Release only when all answers are YES:
-
-- [ ] exact release commit is green in CI
-- [ ] staging Firebase deploy matches the release commit
-- [ ] production Firebase project IDs are correct
-- [ ] Groq staging smoke test passed
-- [ ] production Groq retention configuration reviewed
-- [ ] App Check validated on physical iOS and Android devices
-- [ ] App Check enforcement enabled for production callables
-- [ ] APNs/FCM push tests passed
-- [ ] two-device concurrency scenarios passed
-- [ ] household deletion passed with realistic data
-- [ ] account deletion passed with realistic member/owner scenarios
-- [ ] privacy policy finalized/published
-- [ ] terms finalized/published if applicable
-- [ ] Apple privacy disclosures completed
-- [ ] Google Play Data Safety completed
-- [ ] final icon/splash/screenshots approved
-- [ ] TestFlight/internal iOS test passed
-- [ ] Play closed/internal Android test passed
-- [ ] production security review completed
-- [ ] final signed production binaries approved
+Release only when repository checks, Supabase backend checks, signed local builds and physical-device acceptance testing all pass.
