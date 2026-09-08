@@ -1,150 +1,118 @@
 # HomeStock Implementation Status
 
-Updated: 11 August 2026
+Updated: 8 September 2026
 
-## Implemented in the current codebase
+## Current state
 
-### Application foundation
+HomeStock is an Expo SDK 57 / React Native / strict TypeScript application in an incremental Firebase-to-Supabase migration. Firebase remains active for parts of the mobile/backend runtime while Supabase-backed database, auth, realtime and Edge Function work is being introduced and verified.
 
-- Expo SDK 57 / React Native / strict TypeScript project foundation
-- Firebase Auth client with React Native session persistence
-- development, preview and production EAS profiles
-- Firebase Emulator Suite configuration for local/CI verification
-- GitHub Actions CI, security scanning, Firebase deployment, EAS build/submit and release-readiness workflows
+Mobile compilation is local. EAS Build and EAS Submit are no longer part of the repository build flow.
 
-### Household lifecycle and authorization
+## Implemented
 
-- household creation and invite-code joining through callable Cloud Functions
-- owner/admin/member authorization model
-- member administration and invite regeneration
-- ownership transfer from the current owner to another member; previous owner becomes admin
-- voluntary household leave for admins/members with automatic `defaultHouseholdId` cleanup
-- sole-owner permanent household deletion with active-invite removal and recursive household cleanup
-- deletion lock ownership so an interrupted recursive delete can be retried safely even if child membership documents were already removed
-- separate in-app account deletion requiring recent authentication
-- account deletion blocks users who still own a household, removes personal profile/device/quota/membership data, deletes Firebase Authentication identity and preserves shared household accounting history required by remaining members
-- lifecycle/audit events for joins, leaves, ownership transfer, purchases, expenses and settlements
+### Application and household
+
+- persisted authentication
+- household creation/joining and role management
+- invite regeneration
+- ownership transfer, member removal and household leave
+- guarded account/household deletion flows
+- lifecycle/activity records
 
 ### Inventory, shopping and purchases
 
 - household-scoped inventory CRUD
-- search, category/status filtering and sorting
-- transactional quantity adjustments with low/out-of-stock status derivation
-- mark-finished + add-to-shopping transaction
-- shared shopping list with deterministic item IDs and duplicate prevention
-- barcode scan flow for existing and new items
-- transactional purchase flow recording store, quantity, unit price, editable purchase date and total price
-- inventory replenishment, price change calculation/history and activity generation
-- concurrency coverage for simultaneous inventory updates and simultaneous purchase attempts
+- filtering/sorting and low/out-of-stock state
+- barcode scanning
+- shared shopping list
+- transactional quantity and purchase operations
+- purchase and price history
+- concurrency coverage for critical mutations
 
-### Household finance / Go Dutch
+### Household finance
 
-- household-wide expense categories
-- trusted shared-expense creation with direct per-person or itemized splits
-- deterministic proportional discount/fee allocation with exact cent reconciliation
-- per-expense debt records
-- partial/full repayment recording by debtor or payee
-- transaction-safe settlement updates and immutable settlement records
-- fail-closed validation of stored debt state: corrupted `settledCents` values are rejected instead of silently resetting/reopening a debt
-- Finance balance view showing what the current user owes/is owed
-- monthly household budget and per-category limits controlled by owner/admin roles
-- concurrency coverage for racing repayments
+- direct and itemized shared expenses
+- deterministic discount/fee allocation and cent reconciliation
+- debt tracking
+- partial/full repayments
+- monthly/category budgets
+- concurrency-safe settlement behavior
 
 ### AI
 
-- Groq client isolated to Cloud Functions with `GROQ_API_KEY` in Firebase Secret Manager
-- expense-category suggestions with strict structured output
-- bill-text assistant producing a reviewable draft; deterministic HomeStock code performs the final money/debt calculations
-- household spending insights generated from aggregate month/category/budget totals
-- per-user daily quotas for AI category, bill and insight requests
-- member-readable/backend-write-only AI insights and backend-only quota state
-- bounded Groq outbound requests so a stalled provider cannot hold a function open indefinitely
+- Groq-assisted category suggestions
+- review-first bill extraction
+- household spending insights
+- server-side Groq secret handling
+- per-user quotas and bounded provider requests
+- Supabase AI Edge Function migration work already present in the repository
 
 ### Notifications
 
-- per-device Expo notification registration
-- household notification fan-out from activity events
-- actor exclusion where intended
-- Expo push-ticket persistence and scheduled receipt processing
-- automatic disabling of `DeviceNotRegistered` tokens guarded against token rotation
-- bounded Expo send/receipt network requests and defensive response parsing
-- backend-only Firestore receipt queue
+- Expo push registration and delivery logic
+- household activity fan-out
+- actor exclusion
+- ticket/receipt handling and invalid-token cleanup
 
-### Security and CI hardening
+The complete notification migration to Supabase remains open work and should not be merged until its backend checks and real-device behavior are healthy.
 
-- household-scoped Firestore Security Rules with privileged finance, settlement, lifecycle, AI and audit writes restricted to trusted backend code
-- Auth + Firestore + Cloud Functions emulator integration coverage
-- Firestore Rules emulator coverage
-- CodeQL scanning
-- npm production-dependency audits that surface high findings and block critical findings
-- current Node-24-backed GitHub Action majors for checkout/setup tooling and CodeQL v4
-- Google Cloud deployment through Workload Identity Federation rather than committed service-account credentials
-- generated `gha-creds-*.json` credentials ignored by Git
-- Dependabot configuration for root npm, Functions npm and GitHub Actions updates
-- production release gate checks for App Check enforcement, legal placeholders, real Firebase/EAS configuration and accidental Groq secret exposure
+## Local mobile build flow
 
-## Verification covered by CI
+Development builds:
 
-The CI pipeline verifies:
+```bash
+npm run android
+npm run ios
+```
+
+Release builds:
+
+```bash
+npm run android:release
+npm run ios:release
+```
+
+Native projects can be generated/refreshed with:
+
+```bash
+npm run prebuild
+```
+
+Android requires the local Android SDK/toolchain. iOS requires macOS and Xcode. Signing credentials are required for distributable release binaries.
+
+## CI and security
+
+GitHub Actions are retained for code verification and security, not hosted mobile compilation. The repository includes:
 
 - strict TypeScript typecheck
 - ESLint
 - unit tests
-- Cloud Functions TypeScript build
-- Auth + Firestore + Cloud Functions emulator integration tests
-- Firestore Security Rules emulator tests
+- Firebase Functions build/tests and Firestore Rules tests
+- Supabase schema/Edge Function backend checks
+- CodeQL
+- dependency audits
+- release-readiness checks
 
-The integration suites cover, among other cases:
+Backend deployment workflows are separate from compiling the mobile application.
 
-- invalid invite rejection and household create/join/rejoin flows
-- ownership transfer, leave and ownerless-household prevention
-- sole-owner household deletion and blocked deletion while another member remains
-- interrupted household deletion retry authorization and prevention of deletion-lock takeover
-- account deletion for non-owners and owner deletion guard
-- transactional purchases, repeat-purchase rejection and non-member denial
-- simultaneous inventory updates and simultaneous purchase protection
-- direct/itemized finance splits, discounts, fees and exact cent reconciliation
-- outsider participant denial and budget permissions
-- partial/full settlement, racing settlement attempts, overpayment/already-settled rejection and outsider denial
-- rejection of corrupted stored settlement state rather than silently changing financial history
-- Firestore tenant isolation and backend-only write boundaries
+## Migration work still open
 
-CI intentionally does not call the live Groq or Expo/APNs/FCM services. Those require staging credentials and physical-device smoke tests.
+- complete notification/lifecycle Supabase migration
+- finish mobile service-import cutover
+- verify the migrated backend on physical devices
+- remove Firebase packages/Functions/rules/workflows only after the final cutover is proven
+- reconcile or close migration PRs once a single verified cutover path is selected
 
-## Known dependency posture
+## Release work still required
 
-The security workflow currently reports high and moderate transitive findings rather than hiding them:
+- real backend environment/project configuration
+- production signing credentials
+- APNs/FCM/Expo push configuration as applicable
+- staging App Check/native attestation verification
+- live AI/push smoke tests
+- privacy/terms finalization
+- icons/screenshots/store metadata
+- TestFlight and Google Play internal/closed-track testing
+- final security review
 
-- the mobile Expo/Metro toolchain currently resolves vulnerable `image-size` versions; npm's forced remediation proposes a breaking downgrade outside the supported Expo/React Native stack, so the finding remains visible while upstream remediation is monitored;
-- moderate `uuid` findings are currently transitive through Expo/Google/Firebase dependency chains; direct Firebase Admin/Functions dependencies should stay on supported current releases rather than being force-downgraded;
-- any future **critical** production dependency finding fails the Security workflow.
-
-Do not use `npm audit fix --force` as an unattended production remediation. Review dependency-tree and framework compatibility first.
-
-## Repository hardening still required
-
-- Generate and commit `package-lock.json` for both the repository root and `functions/`, then switch CI/deploy installs from `npm install` to `npm ci`. The current environment did not provide a reliable way to generate trustworthy lockfiles, so they were not fabricated by hand.
-- Add/expand rate and abuse controls for non-AI sensitive callables such as invite and administrative operations. AI endpoints already have daily quotas.
-- Enable Firebase App Check only after valid native iOS/Android attestation has been proven on staging devices, then set production callable Functions to `enforceAppCheck: true`.
-- Continue expanding branch-level callable/rules tests as new behavior is added.
-
-## External setup still required
-
-- choose/create real Firebase development, staging and production projects and replace placeholder project IDs;
-- enable/configure Firebase Authentication, Firestore, Functions, Scheduler and App Check for those environments;
-- link the Expo/EAS project and add the real EAS project ID;
-- configure APNs/FCM and production signing credentials;
-- set the Groq production secret in Firebase Secret Manager and review production retention controls;
-- perform staging live-AI, push-notification and physical-device smoke tests;
-- finalize legal operator/contact/effective-date placeholders and publish privacy/terms URLs;
-- provide final app icon, splash and store assets;
-- complete TestFlight / Play internal-or-closed-track verification and store submissions.
-
-## Product/UX work that is not a security release blocker
-
-- richer offline/network retry UX
-- broader accessibility/device QA and dynamic text checks
-- dark-mode UI implementation
-- optional custom inventory-category UI
-- optional multiple-household switching
-- expiry/recipes/advanced analytics/widgets only after the production baseline is stable
+See `docs/PRODUCTION_RELEASE.md` for the release checklist and `docs/SUPABASE_SETUP.md` for the current Supabase setup.
