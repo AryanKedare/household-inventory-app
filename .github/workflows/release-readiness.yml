@@ -57,19 +57,6 @@ jobs:
             exit 1
           fi
 
-      - name: Require real EAS project ID
-        shell: bash
-        run: |
-          node <<'NODE'
-          const fs = require('fs');
-          const config = JSON.parse(fs.readFileSync('app.json', 'utf8'));
-          const projectId = config?.expo?.extra?.eas?.projectId;
-          if (typeof projectId !== 'string' || projectId.length < 10) {
-            console.error('Production release blocked: app.json has no real expo.extra.eas.projectId.');
-            process.exit(1);
-          }
-          NODE
-
       - name: Reject placeholder Firebase project aliases
         shell: bash
         run: |
@@ -103,4 +90,4 @@ jobs:
           test -f docs/PRODUCTION_RELEASE.md
 
       - name: Release gate passed
-        run: echo 'Repository-level production release gates passed. Continue with physical-device and store-console sign-off from docs/PRODUCTION_RELEASE.md.'
+        run: echo 'Repository-level production release gates passed. Continue with local signed native builds, physical-device testing and store-console sign-off from docs/PRODUCTION_RELEASE.md.'
