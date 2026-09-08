@@ -1,5 +1,7 @@
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+import Config from 'react-native-config';
+
+const supabaseUrl = Config.SUPABASE_URL;
+const supabasePublishableKey = Config.SUPABASE_PUBLISHABLE_KEY;
 
 export const isSupabaseConfigured =
   typeof supabaseUrl === 'string' &&
